@@ -274,13 +274,14 @@ static void close_page_xfer(struct page_xfer *xfer)
 	close_image(xfer->pmi);
 }
 
-static int open_page_local_xfer(struct page_xfer *xfer, int fd_type, long id)
+static int open_page_local_xfer(struct page_xfer *xfer, int fd_type, long id,
+                                bool meta)
 {
 	xfer->pmi = open_image(fd_type, O_DUMP, id);
 	if (!xfer->pmi)
 		return -1;
 
-	xfer->pi = open_pages_image(O_DUMP, xfer->pmi);
+	xfer->pi = open_pages_image(O_DUMP, xfer->pmi, meta);
 	if (!xfer->pi) {
 		close_image(xfer->pmi);
 		return -1;
@@ -327,12 +328,12 @@ out:
 	return 0;
 }
 
-int open_page_xfer(struct page_xfer *xfer, int fd_type, long id)
+int open_page_xfer(struct page_xfer *xfer, int fd_type, long id, bool meta)
 {
 	if (opts.use_page_server)
 		return open_page_server_xfer(xfer, fd_type, id);
 	else
-		return open_page_local_xfer(xfer, fd_type, id);
+		return open_page_local_xfer(xfer, fd_type, id, meta);
 }
 
 static int page_xfer_dump_hole(struct page_xfer *xfer,
@@ -555,7 +556,7 @@ static int page_server_open(int sk, struct page_server_iov *pi)
 
 	page_server_close();
 
-	if (open_page_local_xfer(&cxfer.loc_xfer, type, id))
+	if (open_page_local_xfer(&cxfer.loc_xfer, type, id, false))
 		return -1;
 
 	cxfer.dst_id = pi->dst_id;

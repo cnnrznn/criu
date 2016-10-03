@@ -479,7 +479,7 @@ int open_page_read_at(int dfd, int id, struct page_read *pr, int pr_flags)
 		return -1;
 	}
 
-	pr->pi = open_pages_image_at(dfd, flags, pr->pmi);
+	pr->pi = open_pages_image_at(dfd, flags, pr->pmi, false);
 	if (!pr->pi) {
 		close_page_read(pr);
 		return -1;

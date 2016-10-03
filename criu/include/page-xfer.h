@@ -33,7 +33,7 @@ struct page_xfer {
 	struct page_read *parent;
 };
 
-extern int open_page_xfer(struct page_xfer *xfer, int fd_type, long id);
+extern int open_page_xfer(struct page_xfer *xfer, int fd_type, long id, bool meta);
 struct page_pipe;
 extern int page_xfer_dump_pages(struct page_xfer *, struct page_pipe *,
 				unsigned long off, bool dump_lazy);

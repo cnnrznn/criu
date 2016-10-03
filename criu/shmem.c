@@ -663,7 +663,7 @@ static int dump_one_shmem(struct shmem_info *si)
 	if (!pp)
 		goto err_unmap;
 
-	err = open_page_xfer(&xfer, CR_FD_SHMEM_PAGEMAP, si->shmid);
+	err = open_page_xfer(&xfer, CR_FD_SHMEM_PAGEMAP, si->shmid, false);
 	if (err)
 		goto err_pp;
 

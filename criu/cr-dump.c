@@ -1473,7 +1473,7 @@ static int cr_pre_dump_finish(int ret)
 
 		pr_info("\tPre-dumping %d\n", item->pid.virt);
 		timing_start(TIME_MEMWRITE);
-		ret = open_page_xfer(&xfer, CR_FD_PAGEMAP, item->pid.virt);
+		ret = open_page_xfer(&xfer, CR_FD_PAGEMAP, item->pid.virt, false);
 		if (ret < 0)
 			goto err;
 

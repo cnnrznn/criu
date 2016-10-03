@@ -114,6 +114,8 @@ struct cr_options {
 	 * to turn one ON while the code is in.
 	 */
 	bool			deprecated_ok;
+
+    bool            meta_dump;
 };
 
 extern struct cr_options opts;

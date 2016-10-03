@@ -453,7 +453,8 @@ void up_page_ids_base(void)
 	page_ids += 0x10000;
 }
 
-struct cr_img *open_pages_image_at(int dfd, unsigned long flags, struct cr_img *pmi)
+struct cr_img *open_pages_image_at(int dfd, unsigned long flags, struct cr_img *pmi,
+                                    bool meta)
 {
 	unsigned id;
 
@@ -470,12 +471,15 @@ struct cr_img *open_pages_image_at(int dfd, unsigned long flags, struct cr_img *
 			return NULL;
 	}
 
-	return open_image_at(dfd, CR_FD_PAGES, flags, id);
+    if (meta)
+	    return open_image_at(dfd, CR_FD_META_PAGES, flags, id);
+    else
+        return open_image_at(dfd, CR_FD_PAGES, flags, id);
 }
 
-struct cr_img *open_pages_image(unsigned long flags, struct cr_img *pmi)
+struct cr_img *open_pages_image(unsigned long flags, struct cr_img *pmi, bool meta)
 {
-	return open_pages_image_at(get_service_fd(IMG_FD_OFF), flags, pmi);
+	return open_pages_image_at(get_service_fd(IMG_FD_OFF), flags, pmi, meta);
 }
 
 /*

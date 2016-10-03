@@ -279,6 +279,7 @@ int main(int argc, char *argv[], char *envp[])
 		{ "cgroup-dump-controller",	required_argument,	0, 1082	},
 		{ SK_INFLIGHT_PARAM,		no_argument,		0, 1083	},
 		{ "deprecated",			no_argument,		0, 1084 },
+		{ "meta-dump",			no_argument,		0, 1085 },
 		{ },
 	};
 
@@ -594,6 +595,9 @@ int main(int argc, char *argv[], char *envp[])
 			pr_msg("Turn deprecated stuff ON\n");
 			opts.deprecated_ok = true;
 			break;
+        case 1085:
+            opts.meta_dump = true;
+            break;
 		case 'V':
 			pr_msg("Version: %s\n", CRIU_VERSION);
 			if (strcmp(CRIU_GITID, "0"))
