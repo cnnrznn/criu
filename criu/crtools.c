@@ -280,6 +280,7 @@ int main(int argc, char *argv[], char *envp[])
 		{ SK_INFLIGHT_PARAM,		no_argument,		0, 1083	},
 		{ "deprecated",			no_argument,		0, 1084 },
 		{ "meta-dump",			no_argument,		0, 1085 },
+		{ "disk-serve",			no_argument,		0, 1086 },
 		{ },
 	};
 
@@ -597,6 +598,9 @@ int main(int argc, char *argv[], char *envp[])
 			break;
         case 1085:
             opts.meta_dump = true;
+            break;
+        case 1086:
+            opts.disk_serve = true;
             break;
 		case 'V':
 			pr_msg("Version: %s\n", CRIU_VERSION);

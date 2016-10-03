@@ -116,6 +116,7 @@ struct cr_options {
 	bool			deprecated_ok;
 
     bool            meta_dump;
+    bool            disk_serve;
 };
 
 extern struct cr_options opts;
