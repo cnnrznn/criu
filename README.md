@@ -103,85 +103,9 @@ CRIU comes with a useful tool for examining these .img files in their de-seriali
             "flags": "PE_PRESENT"
         }, 
         {
-            "vaddr": "0x7f216f81e000", 
-            "nr_pages": 2, 
-            "flags": "PE_PRESENT"
-        }, 
-        {
-            "vaddr": "0x7f216fa21000", 
-            "nr_pages": 2, 
-            "flags": "PE_PRESENT"
-        }, 
-        {
-            "vaddr": "0x7f216fc25000", 
-            "nr_pages": 2, 
-            "flags": "PE_PRESENT"
-        }, 
-        {
-            "vaddr": "0x7f216ffe6000", 
-            "nr_pages": 6, 
-            "flags": "PE_PRESENT"
-        }, 
-        {
-            "vaddr": "0x7f216ffec000", 
-            "nr_pages": 2, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7f216ffef000", 
-            "nr_pages": 1, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7f2170207000", 
-            "nr_pages": 2, 
-            "flags": "PE_PRESENT"
-        }, 
-        {
-            "vaddr": "0x7f217020c000", 
-            "nr_pages": 1, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7f21702b2000", 
-            "nr_pages": 50, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7f21702f2000", 
-            "nr_pages": 310, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7f2170430000", 
-            "nr_pages": 2, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7f2170432000", 
-            "nr_pages": 2, 
-            "flags": "PE_PRESENT"
-        }, 
-        {
-            "vaddr": "0x7f2170434000", 
-            "nr_pages": 1, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7ffcbd06e000", 
-            "nr_pages": 7, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7ffcbd076000", 
-            "nr_pages": 1, 
-            "flags": "PE_LAZY"
-        }, 
-        {
-            "vaddr": "0x7ffcbd13a000", 
-            "nr_pages": 2, 
-            "flags": "PE_PRESENT"
+        ... <other mappings>
         }
     ]
 }
 ```
+In summary, this file describes that pages that are present in a file called 'pages-1.img.' It also describes where in the process' virtual address space the pages are located. 
