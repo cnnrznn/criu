@@ -111,3 +111,5 @@ CRIU comes with a useful tool for examining these .img files in their de-seriali
 In summary, this file describes that pages that are present in a file called 'pages-1.img.' It also describes where in the process' virtual address space the pages are located. 
 
 You will notice that some of these pages are marked with the flag "PE_LAZY." If this flag is present, it means that the page data can be loaded lazily, i.e. on-demand. If this flag is flag is present and the "PE_PRESENT" flag is not, it means that the page data is not present in the pages file. In this case, the userfaultfd daemon is responsible for loading the page data (either from a page server or somewhere else in the file system).
+
+This output was produced from a pagemap file that was created by a "lazy dump." With a pagemap file created from a "full dump," every pagemap entry would contain the flag "PE_PRESENT." 
