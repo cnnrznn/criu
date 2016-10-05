@@ -1666,6 +1666,10 @@ static void finalize_restore_detach(int status)
 	struct pstree_item *item;
 
 	for_each_pstree_item(item) {
+        if (opts.track_mem)
+            if (do_task_reset_dirty_track(item->pid.real))
+                pr_perror("CONNOR: unable to reset dirty track on %d", item->pid.real);
+
 		pid_t pid;
 		int i;
 
@@ -1683,6 +1687,7 @@ static void finalize_restore_detach(int status)
 				pr_perror("Unable to execute %d", pid);
 		}
 	}
+    pr_debug("CONNOR: ran PTRACE_DETACH on all threads");
 }
 
 static void ignore_kids(void)
