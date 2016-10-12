@@ -721,7 +721,8 @@ static int lazy_pages_summary(struct lazy_pages_info *lpi)
 	return 0;
 }
 
-#define POLL_TIMEOUT 5000
+//#define POLL_TIMEOUT 5000
+#define POLL_TIMEOUT -1
 
 static int handle_requests(int epollfd, struct epoll_event *events)
 {
