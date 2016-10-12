@@ -195,7 +195,7 @@ int syscall_seized(struct parasite_ctl *ctl, int nr, unsigned long *ret,
 
 int get_task_regs(pid_t pid, user_regs_struct_t regs, CoreEntry *core)
 {
-	struct xsave_struct xsave	= {  };
+	user_fpregs_struct_t xsave	= {  };
 	UserX86RegsEntry *gpregs	= core->thread_info->gpregs;
 
 	struct iovec iov;
@@ -623,7 +623,7 @@ void *mmap_seized(struct parasite_ctl *ctl,
 	if (IS_ERR_VALUE(map)) {
 		if (map == -EACCES && (prot & PROT_WRITE) && (prot & PROT_EXEC))
 			pr_warn("mmap(PROT_WRITE | PROT_EXEC) failed for %d, "
-				"check selinux execmem policy\n", ctl->pid.real);
+				"check selinux execmem policy\n", ctl->rpid);
 		return NULL;
 	}
 

@@ -114,6 +114,7 @@ struct cr_options {
 	 * to turn one ON while the code is in.
 	 */
 	bool			deprecated_ok;
+	bool			display_stats;
 
     bool            meta_dump;
     bool            disk_serve;
