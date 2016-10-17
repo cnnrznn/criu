@@ -305,10 +305,12 @@ static int open_page_local_xfer(struct page_xfer *xfer, int fd_type, long id,
 	 *    to exist in parent (either pagemap or hole)
 	 */
 	xfer->parent = NULL;
-	if (fd_type == CR_FD_PAGEMAP || fd_type == CR_FD_SHMEM_PAGEMAP) {
+	if (fd_type == CR_FD_PAGEMAP || fd_type == CR_FD_SHMEM_PAGEMAP ||
+            fd_type == CR_FD_META_PAGEMAP) {
 		int ret;
 		int pfd;
-		int pr_flags = (fd_type == CR_FD_PAGEMAP) ? PR_TASK : PR_SHMEM;
+		int pr_flags = (fd_type == CR_FD_PAGEMAP ||
+                        fd_type == CR_FD_META_PAGEMAP) ? PR_TASK : PR_SHMEM;
 
 		pfd = openat(get_service_fd(IMG_FD_OFF), CR_PARENT_LINK, O_RDONLY);
 		if (pfd < 0 && errno == ENOENT)
