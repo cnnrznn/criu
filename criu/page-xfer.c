@@ -707,7 +707,7 @@ static int disk_serve_get_pages(int sk, struct page_server_iov *pi)
     dps->pr.read_pages(&dps->pr, pi->vaddr, pi->nr_pages, buf);
     pr_debug("CONNOR: read %d pages starting at %lu into buffer\n", pi->nr_pages, pi->vaddr);
 
-	ret = send_psi(sk, PS_IOV_ADD, pi->nr_pages, pi->vaddr, pi->dst_id);
+	ret = send_psi(sk, PS_IOV_ADD, pi->nr_pages, dps->pr.pe->vaddr, pi->dst_id);
     if (ret)
         goto out;
     pr_debug("CONNOR: send_psi success!\n");
