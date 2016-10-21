@@ -123,7 +123,8 @@ static int write_pages_to_server(struct page_xfer *xfer,
 	return 0;
 }
 
-static int write_pagemap_to_server(struct page_xfer *xfer, struct iovec *iov, u32 flags)
+static int write_pagemap_to_server(struct page_xfer *xfer, struct iovec *iov, u32 flags,
+                    unsigned long version, unsigned int addr, unsigned int port)
 {
 	u32 cmd = 0;
 
@@ -239,7 +240,8 @@ static int check_pagehole_in_parent(struct page_read *p, struct iovec *iov)
 	}
 }
 
-static int write_pagemap_loc(struct page_xfer *xfer, struct iovec *iov, u32 flags)
+static int write_pagemap_loc(struct page_xfer *xfer, struct iovec *iov, u32 flags,
+                    unsigned long version, unsigned int addr, unsigned int port)
 {
 	int ret;
 	PagemapEntry pe = PAGEMAP_ENTRY__INIT;
@@ -247,6 +249,9 @@ static int write_pagemap_loc(struct page_xfer *xfer, struct iovec *iov, u32 flag
 	iovec2pagemap(iov, &pe);
 	pe.has_flags = true;
 	pe.flags = flags;
+    pe.version = version;
+    pe.addr = addr;
+    pe.port = port;
 
 	if (flags & PE_PRESENT) {
 		if (opts.auto_dedup && xfer->parent != NULL) {
@@ -356,7 +361,7 @@ static int page_xfer_dump_hole(struct page_xfer *xfer,
 	pr_debug("\th %p [%u]\n", hole->iov_base,
 			(unsigned int)(hole->iov_len / PAGE_SIZE));
 
-	if (xfer->write_pagemap(xfer, hole, flags))
+	if (xfer->write_pagemap(xfer, hole, flags, 0, 0, 0))
 		return -1;
 
 	return 0;
@@ -420,6 +425,24 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 	unsigned int cur_hole = 0;
 	int ret;
 
+    struct page_read pr;
+    struct iovec piov;
+    int dfd = -1;
+    long version = 0;
+    // TODO assign this nodes interface
+    int addr = 0;
+    int port = 0;
+
+    if (opts.pico_cache) {
+        // 1. open pico-cache dirfd for open_page_read_at
+        dfd = open(opts.pico_cache, O_RDONLY);
+        // 2. open pagemap image for cached pagemap
+	    ret = open_page_read_at(dfd, xfer->pid, &pr, PR_TASK);
+        if (ret <= 0)
+            return -1;
+        pr.get_pagemap(&pr, &piov);
+    }
+
 	pr_debug("Transferring pages:\n");
 
 	list_for_each_entry(ppb, &pp->bufs, l) {
@@ -440,9 +463,37 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 			pr_debug("\tp %p [%u]\n", iov.iov_base,
 					(unsigned int)(iov.iov_len / PAGE_SIZE));
 
+            if (opts.pico_cache) {
+                pr_debug("CONNOR: first cache page: %lu\n", pr.pe->vaddr);
+                pr_debug("CONNOR: lalal curr page: %lu\n", (unsigned long)iov.iov_base);
+
+                /*
+                 * 1. dump all complete cached pmes/pages (unless lazy) until next present region
+                 * 2. dump partial cached region before present region (if exists)
+                 * 3. dump current region
+                 * 4. while (vaddr + (nr_pages * PAGESIZE) <= (iov_base + iov_len) {
+                 *      get_pagemap // get next pme
+                 *  }
+                 * 5. if (vaddr < iov_base+iov_len)
+                 *      seek iov_base + iov_len
+                 *    else
+                 *      leave where it is
+                 */
+                while (pr.cvaddr < iov.iov_base) {
+                    // 1. if complete, dump complete region, call get_pagemap
+                    // 2. else, dump partial region, seek_page iov_base
+                }
+
+                // 3. look for first page in region in cache pagemap, if present, use their version# (if dirty, increment)
+                //      (however, we now "own" the page)
+
+                // 3.5 if vaddr + (nr_pages*PAGESIZE) > iov_base+iov_len, seek iov_base+iov_len
+                //     else, get_
+            }
+
 			if (ppb->flags & PPB_LAZY) {
 				if (!dump_lazy) {
-					if (xfer->write_pagemap(xfer, &iov, PE_LAZY))
+					if (xfer->write_pagemap(xfer, &iov, PE_LAZY, version, addr, port))
 						return -1;
 					continue;
 				} else {
@@ -450,12 +501,17 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 				}
 			}
 
-			if (xfer->write_pagemap(xfer, &iov, flags))
+			if (xfer->write_pagemap(xfer, &iov, flags, version, addr, port))
 				return -1;
 			if (xfer->write_pages(xfer, ppb->p[0], iov.iov_len))
 				return -1;
 		}
 	}
+
+    if (opts.pico_cache) {
+        close(dfd);
+        pr.close(&pr);
+    }
 
 	return dump_holes(xfer, pp, &cur_hole, NULL, off);
 }
@@ -607,7 +663,7 @@ static int page_server_add(int sk, struct page_server_iov *pi, u32 flags)
 		return -1;
 
 	psi2iovec(pi, &iov);
-	if (lxfer->write_pagemap(lxfer, &iov, flags))
+	if (lxfer->write_pagemap(lxfer, &iov, flags, 0, 0, 0))
 		return -1;
 
 	if (!(flags & PE_PRESENT))
