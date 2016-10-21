@@ -118,6 +118,7 @@ struct cr_options {
 
     bool            meta_dump;
     bool            disk_serve;
+    char            *pico_cache_dump;
 };
 
 extern struct cr_options opts;

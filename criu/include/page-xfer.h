@@ -12,7 +12,8 @@ extern int cr_page_server(bool daemon_mode, int cfd);
 
 struct page_xfer {
 	/* transfers one vaddr:len entry */
-	int (*write_pagemap)(struct page_xfer *self, struct iovec *iov, u32 flags);
+	int (*write_pagemap)(struct page_xfer *self, struct iovec *iov, u32 flags,
+                unsigned long version, unsigned int addr, unsigned int port);
 	/* transfers pages related to previous pagemap */
 	int (*write_pages)(struct page_xfer *self, int pipe, unsigned long len);
 	void (*close)(struct page_xfer *self);
@@ -31,6 +32,9 @@ struct page_xfer {
 	};
 
 	struct page_read *parent;
+
+    pid_t pid;
+    struct vm_area_list *vma_area_list;
 };
 
 extern int open_page_xfer(struct page_xfer *xfer, int fd_type, long id, bool meta);
