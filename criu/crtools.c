@@ -282,6 +282,7 @@ int main(int argc, char *argv[], char *envp[])
 		{ "display-stats",		no_argument,		0, 1086 },
 		{ "meta-dump",			no_argument,		0, 2000 },
 		{ "disk-serve",			no_argument,		0, 2001 },
+        { "pico-cache",         required_argument,  0, 2002 },
 		{ },
 	};
 
@@ -605,6 +606,9 @@ int main(int argc, char *argv[], char *envp[])
             break;
         case 2001:
             opts.disk_serve = true;
+            break;
+        case 2002:
+            opts.pico_cache = optarg;
             break;
 		case 'V':
 			pr_msg("Version: %s\n", CRIU_VERSION);
