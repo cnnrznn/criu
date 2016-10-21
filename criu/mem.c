@@ -295,6 +295,8 @@ static int __parasite_dump_pages_seized(struct pstree_item *item,
 	unsigned cpp_flags = 0;
 	unsigned long pmc_size;
 
+    xfer.pid = item->pid.virt;
+
 	pr_info("\n");
 	pr_info("Dumping pages (type: %d pid: %d)\n", CR_FD_PAGES, item->pid.real);
 	pr_info("----------------------------------------\n");
