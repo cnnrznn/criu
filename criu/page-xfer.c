@@ -439,9 +439,9 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     int addr = 0;
     int port = 0;
 
-    if (opts.pico_cache) {
-        // 1. open pico-cache dirfd for open_page_read_at
-        dfd = open(opts.pico_cache, O_RDONLY);
+    if (opts.pico_cache_dump) {
+        // 1. open pico-cache_dump dirfd for open_page_read_at
+        dfd = open(opts.pico_cache_dump, O_RDONLY);
         // 2. open pagemap image for cached pagemap
 	    ret = open_page_read_at(dfd, xfer->pid, &pr, PR_TASK);
         if (ret <= 0)
@@ -469,7 +469,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 			pr_debug("\tp %p [%u]\n", iov.iov_base,
 					(unsigned int)(iov.iov_len / PAGE_SIZE));
 
-            if (opts.pico_cache) {
+            if (opts.pico_cache_dump) {
                 /*
                  * 1. dump all complete cached pmes/pages (unless lazy) until next present region
                  * 2. dump partial cached region before present region (if exists)
@@ -568,7 +568,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 		}
 	}
 
-    if (opts.pico_cache) {
+    if (opts.pico_cache_dump) {
         close(dfd);
         pr.close(&pr);
     }
