@@ -25,6 +25,8 @@
 #include "quicksort.h"
 #include "binsearch.h"
 
+#define MIN(a, b) a < b ? a : b;
+
 static disk_pages **dpgs;
 static int dpgs_index = 0;
 static array dpgs_arr;
@@ -249,8 +251,11 @@ static int write_pagemap_loc(struct page_xfer *xfer, struct iovec *iov, u32 flag
 	iovec2pagemap(iov, &pe);
 	pe.has_flags = true;
 	pe.flags = flags;
+    pe.has_version = true;
     pe.version = version;
+    pe.has_addr = true;
     pe.addr = addr;
+    pe.has_port = true;
     pe.port = port;
 
 	if (flags & PE_PRESENT) {
@@ -425,11 +430,12 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 	unsigned int cur_hole = 0;
 	int ret;
 
+    void *buf;
     struct page_read pr;
-    struct iovec piov;
+    struct iovec tmpiov, ciov;
     int dfd = -1;
     long version = 0;
-    // TODO assign this nodes interface
+    // TODO assign this node's interface
     int addr = 0;
     int port = 0;
 
@@ -440,7 +446,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 	    ret = open_page_read_at(dfd, xfer->pid, &pr, PR_TASK);
         if (ret <= 0)
             return -1;
-        pr.get_pagemap(&pr, &piov);
+        pr.get_pagemap(&pr, &ciov);
     }
 
 	pr_debug("Transferring pages:\n");
@@ -464,47 +470,101 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 					(unsigned int)(iov.iov_len / PAGE_SIZE));
 
             if (opts.pico_cache) {
-                pr_debug("CONNOR: first cache page: %lu\n", pr.pe->vaddr);
-                pr_debug("CONNOR: lalal curr page: %lu\n", (unsigned long)iov.iov_base);
-
                 /*
                  * 1. dump all complete cached pmes/pages (unless lazy) until next present region
                  * 2. dump partial cached region before present region (if exists)
-                 * 3. dump current region
-                 * 4. while (vaddr + (nr_pages * PAGESIZE) <= (iov_base + iov_len) {
-                 *      get_pagemap // get next pme
-                 *  }
-                 * 5. if (vaddr < iov_base+iov_len)
-                 *      seek iov_base + iov_len
-                 *    else
-                 *      leave where it is
+                 * 3. alternate dumping new regions and overlapping regions
+                        When they overlap, use appropriate version# and addr. Increment page_read appropriately
+                        When new, verion#=0, addr and port are current interface
                  */
-                while (pr.cvaddr < iov.iov_base) {
-                    // 1. if complete, dump complete region, call get_pagemap
-                    // 2. else, dump partial region, seek_page iov_base
+                int mode;
+                while ((void*)pr.cvaddr < iov.iov_base) {
+                    buf = NULL;
+                    mode = 0;
+                    if (ciov.iov_base + ciov.iov_len <= iov.iov_base) {
+                        tmpiov.iov_base = (void*)pr.cvaddr;
+                        tmpiov.iov_len = ciov.iov_base + ciov.iov_len - tmpiov.iov_base;
+                        mode = 1;
+                    }
+                    else {
+                        tmpiov.iov_base = (void*)pr.cvaddr;
+                        tmpiov.iov_len = iov.iov_base - tmpiov.iov_base;
+                    }
+                    xfer->write_pagemap(xfer, &tmpiov, pr.pe->flags, pr.pe->version, pr.pe->addr, pr.pe->port);
+                    if (pr.pe->flags == PE_PRESENT) {
+                        buf = malloc(tmpiov.iov_len);
+                        pr.read_pages(&pr, pr.cvaddr, tmpiov.iov_len/PAGE_SIZE, buf);
+                        ret = write(img_raw_fd(pr.pi), buf, tmpiov.iov_len);
+                        if (ret < tmpiov.iov_len)
+                            return -1;
+                        free(buf);
+                    }
+                    if (mode)
+                        pr.get_pagemap(&pr, &ciov);
+                    else
+                        pr.seek_page(&pr, (unsigned long)iov.iov_base, 1);
                 }
 
-                // 3. look for first page in region in cache pagemap, if present, use their version# (if dirty, increment)
-                //      (however, we now "own" the page)
+                unsigned long size_dumped = 0;
+                void *end;
+                tmpiov.iov_base = iov.iov_base;
+                while (size_dumped < iov.iov_len) {
+                    buf = NULL;
+                    if (tmpiov.iov_base < (void*)pr.cvaddr) {   // only in new
+                        end = MIN(iov.iov_base + iov.iov_len, (void*)pr.cvaddr);
+                    }
+                    else {                                      // overlap
+                        end = MIN(iov.iov_base + iov.iov_len, ciov.iov_base + ciov.iov_len)
+                        version = pr.pe->version;
+                        if (ppb->flags & PPB_DIRTY) {
+                            version++;
+                        }
+                        else {
+                            addr = pr.pe->addr;
+                            port = pr.pe->port;
+                        }
 
-                // 3.5 if vaddr + (nr_pages*PAGESIZE) > iov_base+iov_len, seek iov_base+iov_len
-                //     else, get_
+                        if (ciov.iov_base + ciov.iov_len > iov.iov_base + iov.iov_len)
+                            pr.seek_page(&pr, (unsigned long)(iov.iov_base + iov.iov_len), 1);
+                        else
+                            pr.get_pagemap(&pr, &ciov);
+                    }
+                    tmpiov.iov_len = end - tmpiov.iov_base;
+                    size_dumped += tmpiov.iov_len;
+
+                    if (ppb->flags & PPB_LAZY && !dump_lazy) {
+                        flags = PE_LAZY;
+                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port))
+                            return -1;
+                    }
+                    else if (ppb->flags & PPB_LAZY && dump_lazy) {
+                        flags |= PE_LAZY;
+                    }
+                    if (flags != PE_LAZY) {
+                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port))
+                            return -1;
+                        if (xfer->write_pages(xfer, ppb->p[0], tmpiov.iov_len))
+                            return -1;
+                    }
+                    tmpiov.iov_base = tmpiov.iov_base + tmpiov.iov_len;
+                }
             }
+            else {
+                if (ppb->flags & PPB_LAZY) {
+                    if (!dump_lazy) {
+                        if (xfer->write_pagemap(xfer, &iov, PE_LAZY, version, addr, port))
+                            return -1;
+                        continue;
+                    } else {
+                        flags |= PE_LAZY;
+                    }
+                }
 
-			if (ppb->flags & PPB_LAZY) {
-				if (!dump_lazy) {
-					if (xfer->write_pagemap(xfer, &iov, PE_LAZY, version, addr, port))
-						return -1;
-					continue;
-				} else {
-					flags |= PE_LAZY;
-				}
-			}
-
-			if (xfer->write_pagemap(xfer, &iov, flags, version, addr, port))
-				return -1;
-			if (xfer->write_pages(xfer, ppb->p[0], iov.iov_len))
-				return -1;
+                if (xfer->write_pagemap(xfer, &iov, flags, version, addr, port))
+                    return -1;
+                if (xfer->write_pages(xfer, ppb->p[0], iov.iov_len))
+                    return -1;
+            }
 		}
 	}
 
