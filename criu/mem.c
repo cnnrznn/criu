@@ -158,6 +158,9 @@ static int generate_iovs(struct vma_area *vma, struct page_pipe *pp, u64 *map, u
 		if (vma_entry_can_be_lazy(vma->e))
 			ppb_flags |= PPB_LAZY;
 
+        if (at[pfn] & PME_SOFT_DIRTY)
+            ppb_flags |= PPB_DIRTY;
+
 		/*
 		 * If we're doing incremental dump (parent images
 		 * specified) and page is not soft-dirty -- we dump
@@ -296,6 +299,7 @@ static int __parasite_dump_pages_seized(struct pstree_item *item,
 	unsigned long pmc_size;
 
     xfer.pid = item->pid.virt;
+    xfer.vma_area_list = vma_area_list;
 
 	pr_info("\n");
 	pr_info("Dumping pages (type: %d pid: %d)\n", CR_FD_PAGES, item->pid.real);

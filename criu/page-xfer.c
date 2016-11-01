@@ -19,6 +19,7 @@
 #include "parasite-syscall.h"
 #include "fcntl.h"
 
+#include "vma.h"
 #include "images/pstree.pb-c.h"
 #include "disk-serve.h"
 #include "array.h"
@@ -432,7 +433,8 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 
     void *buf;
     struct page_read pr;
-    struct iovec tmpiov, ciov;
+    struct iovec tmpiov, ciov, vmaiov;
+    struct vma_area *vma = NULL;
     int dfd = -1;
     long version = 0;
     // TODO assign this node's interface
@@ -447,6 +449,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
         if (ret <= 0)
             return -1;
         pr.get_pagemap(&pr, &ciov);
+        vma = list_entry(xfer->vma_area_list->h.next, typeof(*vma), list);
     }
 
 	pr_debug("Transferring pages:\n");
@@ -477,10 +480,12 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                         When they overlap, use appropriate version# and addr. Increment page_read appropriately
                         When new, verion#=0, addr and port are current interface
                  */
-                int mode;
+                unsigned long size_dumped = 0;
+                void *end;
+
                 while ((void*)pr.cvaddr < iov.iov_base) {
                     buf = NULL;
-                    mode = 0;
+                    int mode = 0;
                     if (ciov.iov_base + ciov.iov_len <= iov.iov_base) {
                         tmpiov.iov_base = (void*)pr.cvaddr;
                         tmpiov.iov_len = ciov.iov_base + ciov.iov_len - tmpiov.iov_base;
@@ -490,14 +495,28 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                         tmpiov.iov_base = (void*)pr.cvaddr;
                         tmpiov.iov_len = iov.iov_base - tmpiov.iov_base;
                     }
-                    xfer->write_pagemap(xfer, &tmpiov, pr.pe->flags, pr.pe->version, pr.pe->addr, pr.pe->port);
-                    if (pr.pe->flags == PE_PRESENT) {
-                        buf = malloc(tmpiov.iov_len);
-                        pr.read_pages(&pr, pr.cvaddr, tmpiov.iov_len/PAGE_SIZE, buf);
-                        ret = write(img_raw_fd(pr.pi), buf, tmpiov.iov_len);
-                        if (ret < tmpiov.iov_len)
-                            return -1;
-                        free(buf);
+                    /*
+                     * TODO check tmpiov for presence in current vma list
+                     * Maybe do a while-loop, dumping pagemap entries for
+                     *  locations that appear in the vma list as well
+                     *  (we don't know what regions may have been freed)
+                     */
+                    vmaiov.iov_base = tmpiov.iov_base;
+                    while (size_dumped < tmpiov.iov_len) {
+                        while (!in_vma_area(vma, (unsigned long)vmaiov.iov_base) &&
+                                    vma->e->start < (unsigned long)vmaiov.iov_base)
+                            vma = list_entry(vma->list.next, typeof(*vma), list);
+                        xfer->write_pagemap(xfer, &tmpiov, pr.pe->flags, pr.pe->version, pr.pe->addr, pr.pe->port);
+                        if (pr.pe->flags == PE_PRESENT) {
+                            buf = malloc(tmpiov.iov_len);
+                            pr.read_pages(&pr, pr.cvaddr, tmpiov.iov_len/PAGE_SIZE, buf);
+                            ret = write(img_raw_fd(pr.pi), buf, tmpiov.iov_len);
+                            if (ret < tmpiov.iov_len)
+                                return -1;
+                            free(buf);
+                        }
+
+                        size_dumped += vmaiov.iov_len;
                     }
                     if (mode)
                         pr.get_pagemap(&pr, &ciov);
@@ -505,8 +524,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                         pr.seek_page(&pr, (unsigned long)iov.iov_base, 1);
                 }
 
-                unsigned long size_dumped = 0;
-                void *end;
+                size_dumped = 0;
                 tmpiov.iov_base = iov.iov_base;
                 while (size_dumped < iov.iov_len) {
                     buf = NULL;

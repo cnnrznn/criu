@@ -34,6 +34,7 @@ struct page_xfer {
 	struct page_read *parent;
 
     pid_t pid;
+    struct vm_area_list *vma_area_list;
 };
 
 extern int open_page_xfer(struct page_xfer *xfer, int fd_type, long id, bool meta);
