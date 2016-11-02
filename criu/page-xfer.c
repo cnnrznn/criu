@@ -431,7 +431,6 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 	unsigned int cur_hole = 0;
 	int ret;
 
-    void *buf;
     struct page_read pr;
     struct iovec tmpiov, ciov, vmaiov;
     struct vma_area *vma = NULL;
@@ -450,7 +449,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
             return -1;
         pr.get_pagemap(&pr, &ciov);
         vma = list_entry(xfer->vma_area_list->h.next, typeof(*vma), list);
-        vmaiov.iov_base = vma->e->start;
+        vmaiov.iov_base = (void*)vma->e->start;
     }
 
 	pr_debug("Transferring pages:\n");
@@ -488,13 +487,13 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                     end = MIN((void*)vma->e->end, iov.iov_base);
                     vmaiov.iov_len = end - vmaiov.iov_base;
                     // dump start->end (read pagemap, write pagemap) (no present)
-                    pr.seek_page(&pr, vmaiov.iov_base);
+                    pr.seek_page(&pr, (unsigned long)vmaiov.iov_base, 1);
                     xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version,
                         pr.pe->addr, pr.pe->port);
                     // progress pr, vma to first place at/after end
                     if (end < iov.iov_base) { // find new vma
                         vma = list_entry(vma->list.next, typeof(*vma), list);
-                        vmaiov.iov_base = vma->e->start;
+                        vmaiov.iov_base = (void*)vma->e->start;
                     }
                     else { // seek iov.iov_base
                         vmaiov.iov_base = iov.iov_base;
@@ -506,7 +505,6 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                 size_dumped = 0;
                 tmpiov.iov_base = iov.iov_base;
                 while (size_dumped < iov.iov_len) {
-                    buf = NULL;
                     if (tmpiov.iov_base < (void*)pr.cvaddr) {   // only in new
                         end = MIN(iov.iov_base + iov.iov_len, (void*)pr.cvaddr);
                     }
