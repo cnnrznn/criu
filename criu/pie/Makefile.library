@@ -1,7 +1,8 @@
 target			:= native
 
 CFLAGS			:= $(filter-out -DCONFIG_X86_64,$(CFLAGS))
-CFLAGS			+= -Wa,--noexecstack -fno-stack-protector -DCR_NOGLIBC
+CFLAGS			+= -fno-stack-protector -DCR_NOGLIBC
+LDFLAGS			+= -z noexecstack
 
 CFLAGS_native		+= -fpie
 
@@ -13,6 +14,7 @@ ifeq ($(ARCH),x86)
         CFLAGS_native	+= -DCONFIG_X86_64
         CFLAGS_compat	+= -fno-pic -m32 -DCONFIG_X86_32
         CFLAGS_util-vdso-elf32.o	+= -DCONFIG_X86_32
+        OBJS		+= ./$(ARCH_DIR)/memcpy.o
 endif
 
 OBJS			+= log-simple.o util-fd.o util.o

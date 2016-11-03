@@ -12,6 +12,10 @@ travis_prep () {
 	apt-get install -qq protobuf-c-compiler libprotobuf-c0-dev libaio-dev	\
 		libprotobuf-dev protobuf-compiler python-ipaddr libcap-dev	\
 		libnl-3-dev gcc-multilib libc6-dev-i386 gdb bash python-protobuf
+		if [ "$CLANG" = "1" ]; then
+			apt-get install -qq clang
+			MAKE_VARS=CC=clang
+		fi
 	chmod a+x $HOME
 }
 
@@ -20,9 +24,9 @@ travis_prep
 ulimit -c unlimited
 echo "|`pwd`/test/abrt.sh %P %p %s %e" > /proc/sys/kernel/core_pattern
 
-export GCOV=1
-make
-make -C test/zdtm
+export GCOV
+make $(MAKE_VARS)
+make $(MAKE_VARS) -C test/zdtm
 
 ./criu/criu check
 ./criu/criu check --all || echo $?
