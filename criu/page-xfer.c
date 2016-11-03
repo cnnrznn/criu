@@ -433,6 +433,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 
     struct page_read pr;
     struct iovec tmpiov, ciov, vmaiov;
+    vmaiov.iov_base = NULL;
     struct vma_area *vma = NULL;
     int dfd = -1;
     long version = 0;
@@ -487,20 +488,42 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                     end = MIN((void*)vma->e->end, iov.iov_base);
                     vmaiov.iov_len = end - vmaiov.iov_base;
                     // dump start->end (read pagemap, write pagemap) (no present)
-                    pr.seek_page(&pr, (unsigned long)vmaiov.iov_base, 1);
-                    xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version,
-                        pr.pe->addr, pr.pe->port);
-                    // progress pr, vma to first place at/after end
-                    if (end < iov.iov_base) { // find new vma
+                    // TODO what if vma spans multiple pme's? (located on different nodes)
+                    tmpiov.iov_base = vmaiov.iov_base;
+                    while (tmpiov.iov_base < vmaiov.iov_base + vmaiov.iov_len) {
+                        pr.seek_page(&pr, (unsigned long)tmpiov.iov_base, 1);
+                        void *tmpend = MIN(end,
+                            (void*)pr.pe->vaddr + (pr.pe->nr_pages*PAGE_SIZE));
+                        tmpiov.iov_len = tmpend - tmpiov.iov_base;
+                        xfer->write_pagemap(xfer, &tmpiov, pr.pe->flags, pr.pe->version,
+                            pr.pe->addr, pr.pe->port);
+                        if ((void*)pr.pe->vaddr + (pr.pe->nr_pages*PAGE_SIZE) <=
+                                end) {
+                            pr.get_pagemap(&pr, &ciov);
+                        }
+                        else {
+                            pr.seek_page(&pr, (unsigned long)tmpend, 1);
+                        }
+                        tmpiov.iov_base = (void*)pr.cvaddr;
+                    }
+                    if (end <= iov.iov_base) {
                         vma = list_entry(vma->list.next, typeof(*vma), list);
                         vmaiov.iov_base = (void*)vma->e->start;
                     }
-                    else { // seek iov.iov_base
+                    else {
                         vmaiov.iov_base = iov.iov_base;
                     }
                 }
-                // TODO skip vma's within iov
-                // (i.e., seek to first vma after iov)
+                // skip vma's within iov (i.e., seek to first vma after iov)
+                while (vmaiov.iov_base < iov.iov_base + iov.iov_len) {
+                    if ((void*)vma->e->end > iov.iov_base + iov.iov_len) {
+                        vmaiov.iov_base = iov.iov_base + iov.iov_len;
+                    }
+                    else {
+                        vma = list_entry(vma->list.next, typeof(*vma), list);
+                        vmaiov.iov_base = (void*)vma->e->start;
+                    }
+                }
 
                 size_dumped = 0;
                 tmpiov.iov_base = iov.iov_base;
