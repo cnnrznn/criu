@@ -1,0 +1,24 @@
+7/11/16
+
+Compiling a kernel for CRIU:
+    * 'make defconfig' creates a minimal config for the
+        current architecture
+    * edits to .config:
+        * see criu installation wiki page for criu-specific
+            options
+        * enable userfaultfd
+
+4/11/16
+
+Next steps:
+    1. Edit kernel to mark userfaultfd supplied pages
+        as clean.
+        a) this seems to be done in linux/mm/userfaultfd.c
+    2. Configure criu to handle many page servers.
+        a) create a global (int*) in page-xfer.c
+        b) in cr_lazy_pages(), call custom connect_to_page_server()
+            * this array should be sorted by memory region
+        c) in uffd_copy_page(), call custom get_remote_page()
+        d) determine socket for memory region, and send the
+            request there
+        e) unmodified page-server code
