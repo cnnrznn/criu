@@ -18,6 +18,7 @@
 #include "pstree.h"
 #include "parasite-syscall.h"
 #include "fcntl.h"
+#include "lpi.h"
 
 #include "vma.h"
 #include "images/pstree.pb-c.h"
@@ -31,6 +32,28 @@
 static disk_pages **dpgs;
 static int dpgs_index = 0;
 static array dpgs_arr;
+
+typedef struct page_server_t {
+    uint32_t addr;
+    int sk;
+} page_server;
+
+char comp_page_servers(void *a, void *b) {
+    page_server *x = a;
+    page_server *y = b;
+
+    if (x->addr < y->addr)
+        return 1;
+    else if (x->addr > y->addr)
+        return -1;
+    else
+        return 0;
+}
+
+page_server *page_servers = NULL;
+int page_servers_size = 0;
+int page_servers_ct = 0;
+array page_servers_arr;
 
 static int page_server_sk = -1;
 
@@ -439,7 +462,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     long version = 0;
     // TODO assign this node's interface
     int addr = 0;
-    int port = 0;
+    int port = 3333;
 
     if (opts.pico_cache_dump) {
         // 1. open pico-cache_dump dirfd for open_page_read_at
@@ -835,7 +858,7 @@ static int disk_serve_get_pages(int sk, struct page_server_iov *pi)
     other.pid = pi->dst_id;
     void *buf = malloc(pi->nr_pages * PAGE_SIZE);
 
-    dps = binsearch(&dpgs_arr, &other);
+    dps = binsearch(&dpgs_arr, &other, 0, dpgs_arr.size-1);
     pr_debug("CONNOR: binsearch success!\n");
 
     dps->pr.reset(&dps->pr);
@@ -1088,6 +1111,28 @@ no_server:
 	return ret;
 }
 
+int pico_connect_to_page_server()
+{
+    // TODO
+    /*
+     * connect to a page server specified by addr and port
+     * return the fd of the socket
+     * wrapper function for pico_setup_tcp_client(...)
+     */
+
+    return 0;
+}
+
+int pico_disconnect_from_page_server()
+{
+    // TODO
+    /*
+     * disconnect from every page server being used by the process
+     */
+
+    return 0;
+}
+
 int connect_to_page_server(void)
 {
 	if (!opts.use_page_server)
@@ -1180,4 +1225,41 @@ int get_remote_pages(int pid, unsigned long addr, int nr_pages, void *dest)
 		return -1;
 
 	return 1;
+}
+
+int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
+                        int nr_pages, void *dest)
+{
+    // TODO
+
+    /*
+     * 1. get address and port from lpi->pr pagemap entry
+     * 2. binsearch to determine if the socket to that server exists
+     * 3. if not, establish tcp socket to that server
+     * 4. request page as in get_remote_pages() (just call get_remote_pages directly?)
+     */
+
+    if (page_servers == NULL) {
+        page_servers_size = 16;
+        page_servers = malloc(16 * sizeof(page_server));
+        array_init(&page_servers_arr, 16, comp_page_servers);
+    }
+
+    lpi->pr.reset(&lpi->pr);
+    lpi->pr.seek_page(&lpi->pr, addr, 1);
+
+    if (page_servers_ct == 0) { // fist entry
+
+    }
+
+    page_server tmp = { .sk = 0, .addr = lpi->pr.pe->addr };
+    page_server *server = binsearch(&page_servers_arr, &tmp, 0, page_servers_ct);
+
+    if (server == NULL) {   // not found; connect
+
+    }
+
+    // call get_remote_pages
+
+    return 0;
 }

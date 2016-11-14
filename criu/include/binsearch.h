@@ -3,6 +3,6 @@
 
 #include "array.h"
 
-void* binsearch(array*, void*);
+void* binsearch(array*, void*, int start, int end);
 
 #endif /* _CZBINSEARCH */

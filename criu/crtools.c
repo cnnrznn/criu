@@ -283,6 +283,7 @@ int main(int argc, char *argv[], char *envp[])
 		{ "meta-dump",			no_argument,		0, 2000 },
 		{ "disk-serve",			no_argument,		0, 2001 },
         { "pico-cache-dump",         required_argument,  0, 2002 },
+        { "pico-restore", no_argument,              0, 2003},
 		{ },
 	};
 
@@ -609,6 +610,9 @@ int main(int argc, char *argv[], char *envp[])
             break;
         case 2002:
             opts.pico_cache_dump = optarg;
+            break;
+        case 2003:
+            opts.pico_restore = true;
             break;
 		case 'V':
 			pr_msg("Version: %s\n", CRIU_VERSION);

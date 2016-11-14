@@ -1,6 +1,7 @@
 #ifndef __CR_PAGE_XFER__H__
 #define __CR_PAGE_XFER__H__
 #include "pagemap.h"
+#include "lpi.h"
 
 extern int cr_page_server(bool daemon_mode, int cfd);
 
@@ -44,8 +45,14 @@ extern int page_xfer_dump_pages(struct page_xfer *, struct page_pipe *,
 extern int connect_to_page_server(void);
 extern int disconnect_from_page_server(void);
 
+extern int pico_connect_to_page_server(void);
+extern int pico_disconnect_from_page_server(void);
+
 extern int check_parent_page_xfer(int fd_type, long id);
 
 extern int get_remote_pages(int pid, unsigned long addr, int nr_pages, void *dest);
+
+extern int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
+                            int nr_pages, void *dest);
 
 #endif /* __CR_PAGE_XFER__H__ */
