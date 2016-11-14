@@ -614,6 +614,9 @@ int main(int argc, char *argv[], char *envp[])
         case 2003:
             opts.pico_restore = true;
             break;
+        case 2003:
+            opts.pico_restore = true;
+            break;
 		case 'V':
 			pr_msg("Version: %s\n", CRIU_VERSION);
 			if (strcmp(CRIU_GITID, "0"))
