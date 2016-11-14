@@ -37,6 +37,7 @@
 #include "page-xfer.h"
 #include "lock.h"
 #include "rst-malloc.h"
+#include "lpi.h"
 
 #undef  LOG_PREFIX
 #define LOG_PREFIX "lazy-pages: "
@@ -44,20 +45,6 @@
 #define LAZY_PAGES_SOCK_NAME	"lazy-pages.socket"
 
 static mutex_t *lazy_sock_mutex;
-
-struct lazy_pages_info {
-	int pid;
-	int uffd;
-
-	struct list_head pages;
-
-	struct page_read pr;
-
-	unsigned long total_pages;
-	unsigned long copied_pages;
-
-	struct hlist_node hash;
-};
 
 #define LPI_HASH_SIZE	16
 static struct hlist_head lpi_hash[LPI_HASH_SIZE];
@@ -399,7 +386,9 @@ static int uffd_copy_page(struct lazy_pages_info *lpi, __u64 address,
 	struct uffdio_copy uffdio_copy;
 	int rc;
 
-	if (opts.use_page_server)
+    if (opts.pico_restore)
+        rc = pico_get_remote_pages(lpi, address, 1, dest);
+	else if (opts.use_page_server)
 		rc = get_remote_pages(lpi->pid, address, 1, dest);
 	else
 		rc = get_page(lpi, address, dest);
@@ -905,8 +894,8 @@ int cr_lazy_pages()
 	if (prepare_uffds(epollfd))
 		return -1;
 
-	if (connect_to_page_server())
-		return -1;
+    if (connect_to_page_server())
+        return -1;
 
 	ret = handle_requests(epollfd, events);
 	lpi_hash_fini();
