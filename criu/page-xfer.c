@@ -1127,10 +1127,10 @@ int pico_conn_server(int addr, int port)
 	struct sockaddr_in saddr;
 	int sk;
 
-	pr_info("Connecting to server %d:%u\n", addr, (int)htons(port));
+	pr_info("Connecting to server %d:%u\n", addr, port);
 
 	saddr.sin_family = AF_INET;
-	saddr.sin_addr.s_addr = htonl(addr);
+	saddr.sin_addr.s_addr = addr;
 	saddr.sin_port = htons(port);
 
 	sk = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
