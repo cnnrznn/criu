@@ -1265,22 +1265,24 @@ int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
         page_servers_size = 16;
         page_servers = malloc(16 * sizeof(page_server));
         array_init(&page_servers_arr, 16, comp_page_servers);
-
-        disk_serve_prepare();
+        if (opts.pico_cache)
+            disk_serve_prepare();
     }
 
     lpi->pr.reset(&lpi->pr);
     lpi->pr.seek_page(&lpi->pr, addr, 1);
 
     // try to find locally, if present and version number match use local
-    disk_pages other, *dps;
-    other.pid = lpi->pid;
-    dps = binsearch(&dpgs_arr, &other, 0, dpgs_arr.size-1);
-    dps->pr.reset(&dps->pr);
-    if (dps->pr.seek_page(&dps->pr, addr, 1)) {        // page local
-        if (dps->pr.pe->version == lpi->pr.pe->version) {   // same version
-            dps->pr.read_pages(&dps->pr, addr, nr_pages, dest);
-            return 0;
+    if (opts.pico_cache) {
+        disk_pages other, *dps;
+        other.pid = lpi->pid;
+        dps = binsearch(&dpgs_arr, &other, 0, dpgs_arr.size-1);
+        dps->pr.reset(&dps->pr);
+        if (dps->pr.seek_page(&dps->pr, addr, 1)) {        // page local
+            if (dps->pr.pe->version == lpi->pr.pe->version) {   // same version
+                dps->pr.read_pages(&dps->pr, addr, nr_pages, dest);
+                return 0;
+            }
         }
     }
 
