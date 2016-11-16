@@ -1120,22 +1120,40 @@ no_server:
 
 int pico_conn_server(int addr, int port)
 {
-    // TODO
     /*
      * connect to a page server specified by addr and port
      * return the fd of the socket
      * wrapper function for pico_setup_tcp_client(...)
      */
+	struct sockaddr_in saddr;
+	int sk;
 
-    return 0;
+	pr_info("Connecting to server %d:%u\n", addr, (int)htons(port));
+
+	saddr.sin_family = AF_INET;
+	saddr.sin_addr.s_addr = htonl(addr);
+	saddr.sin_port = htons(port);
+
+	sk = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sk < 0) {
+		pr_perror("Can't create socket");
+		return -1;
+	}
+
+	if (connect(sk, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+		pr_perror("Can't connect to server");
+		close(sk);
+		return -1;
+	}
+
+	tcp_cork(sk, true);
+
+	return sk;
 }
 
 int pico_disc_server(int sk)
 {
-    // TODO
-    /*
-     * disconnect from every page server being used by the process
-     */
+    close(sk);
 
     return 0;
 }
@@ -1237,8 +1255,6 @@ int get_remote_pages(int pid, unsigned long addr, int nr_pages, void *dest)
 int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
                         int nr_pages, void *dest)
 {
-    // TODO
-
     /*
      * 1. get address and port from lpi->pr pagemap entry
      * 2. binsearch to determine if the socket to that server exists
@@ -1271,7 +1287,7 @@ int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
 
     if (page_servers_ct == 0) { // fist entry
         page_servers[0].addr = lpi->pr.pe->addr;
-        page_servers[0].sk = pico_conn_server(lpi->pr.pe->addr, lpi->pr.pe->port); // TODO
+        page_servers[0].sk = pico_conn_server(lpi->pr.pe->addr, lpi->pr.pe->port);
         page_servers_arr.elems[0] = (void*) &page_servers[0];
         page_servers_ct++;
     }
@@ -1290,15 +1306,37 @@ int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
         }
 
         page_servers[page_servers_ct].addr = lpi->pr.pe->addr;
-        page_servers[page_servers_ct].sk = pico_conn_server(lpi->pr.pe->addr, lpi->pr.pe->port); // TODO
+        page_servers[page_servers_ct].sk = pico_conn_server(lpi->pr.pe->addr, lpi->pr.pe->port);
         page_servers_arr.elems[page_servers_ct] = (void*) &page_servers[page_servers_ct];
-        server = page_servers[page_servers_ct];
+        server = &page_servers[page_servers_ct];
         page_servers_ct++;
 
         quicksort(0, page_servers_ct-1, &page_servers_arr);
     }
 
     // copy get_remote_pages()
+	int ret;
+	struct page_server_iov pi;
 
-    return 0;
+	if (send_psi(server->sk, PS_IOV_GET, nr_pages, addr, lpi->pid))
+		return -1;
+
+	tcp_nodelay(server->sk, true);
+
+	ret = recv(server->sk, &pi, sizeof(pi), MSG_WAITALL);
+	if (ret != sizeof(pi))
+		return -1;
+
+	/* zero page */
+	if (pi.cmd == PS_IOV_ZERO)
+		return 0;
+
+	if (pi.nr_pages > nr_pages)
+		return -1;
+
+	ret = recv(server->sk, dest, PAGE_SIZE, MSG_WAITALL);
+	if (ret != PAGE_SIZE)
+		return -1;
+
+	return 1;
 }

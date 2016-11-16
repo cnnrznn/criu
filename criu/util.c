@@ -1184,15 +1184,3 @@ int setup_tcp_client(char *addr)
 
 	return sk;
 }
-
-int pico_setup_tcp_client(const char *addr, int port)
-{
-    // TODO
-    /*
-     * Create a socket and connect to the address and port specified.
-     * Return the fd for the socket.
-     * Used by Picocenter ;)
-     */
-
-    return 0;
-}
