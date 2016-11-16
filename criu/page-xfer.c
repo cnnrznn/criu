@@ -460,9 +460,8 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     struct vma_area *vma = NULL;
     int dfd = -1;
     long version = 0;
-    // TODO assign this node's interface
-    int addr = 0;
-    int port = 3333;
+    uint32_t addr = opts.pico_addr.s_addr;
+    uint32_t port = 3333;
 
     if (opts.pico_cache) {
         // 1. open pico-cache dirfd for open_page_read_at

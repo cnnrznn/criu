@@ -2,6 +2,7 @@
 #define __CR_OPTIONS_H__
 
 #include <stdbool.h>
+#include <netinet/in.h>
 
 #include "list.h"
 
@@ -120,6 +121,7 @@ struct cr_options {
     bool            disk_serve;
     char            *pico_cache;
     bool            pico_restore;
+    struct in_addr  pico_addr;
 };
 
 extern struct cr_options opts;
