@@ -464,10 +464,12 @@ int parasite_dump_pages_seized(struct pstree_item *item,
 	ret = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, false);
     if (opts.meta_dump) {
         mdc->lazy = true;
-        extern struct page_read pr;
-        extern struct iovec ciov;
-        pr.reset(&pr);
-        pr.get_pagemap(&pr, &ciov);
+        if (opts.pico_cache) {
+            extern struct page_read pr;
+            extern struct iovec ciov;
+            pr.reset(&pr);
+            pr.get_pagemap(&pr, &ciov);
+        }
 	    ret_meta = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, true);
     }
 	if (ret || ret_meta) {
