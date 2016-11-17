@@ -447,6 +447,10 @@ static int dump_holes(struct page_xfer *xfer, struct page_pipe *pp,
 	return 0;
 }
 
+struct page_read pr;
+char page_read_set = 0;
+struct iovec ciov;
+
 int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 			 unsigned long off, bool dump_lazy)
 {
@@ -454,8 +458,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 	unsigned int cur_hole = 0;
 	int ret;
 
-    struct page_read pr;
-    struct iovec tmpiov, ciov, vmaiov;
+    struct iovec tmpiov, vmaiov;
     vmaiov.iov_base = NULL;
     struct vma_area *vma = NULL;
     int dfd = -1;
@@ -463,14 +466,18 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     uint32_t addr = opts.pico_addr.s_addr;
     uint32_t port = 3333;
 
-    if (opts.pico_cache) {
+    if (opts.pico_cache && !page_read_set) {
+        page_read_set = 1;
         // 1. open pico-cache dirfd for open_page_read_at
         dfd = open(opts.pico_cache, O_RDONLY);
         // 2. open pagemap image for cached pagemap
 	    ret = open_page_read_at(dfd, xfer->pid, &pr, PR_TASK);
         if (ret <= 0)
             return -1;
+        close(dfd);
         pr.get_pagemap(&pr, &ciov);
+    }
+    if (opts.pico_cache) {
         vma = list_entry(xfer->vma_area_list->h.next, typeof(*vma), list);
         vmaiov.iov_base = (void*)vma->e->start;
     }
@@ -610,11 +617,6 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
             }
 		}
 	}
-
-    if (opts.pico_cache) {
-        close(dfd);
-        pr.close(&pr);
-    }
 
 	return dump_holes(xfer, pp, &cur_hole, NULL, off);
 }
