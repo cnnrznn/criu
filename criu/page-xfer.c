@@ -464,9 +464,9 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     int dfd = -1;
     long version = 0;
     const uint32_t maddr = opts.pico_addr.s_addr;
-    uint32_t addr = 0;
+    uint32_t addr = maddr;
     const uint32_t mport = 3333;
-    uint32_t port = 0;
+    uint32_t port = mport;
 
     if (opts.pico_cache && !page_read_set) {
         page_read_set = 1;
