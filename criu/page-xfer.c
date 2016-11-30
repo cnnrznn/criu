@@ -463,8 +463,10 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     struct vma_area *vma = NULL;
     int dfd = -1;
     long version = 0;
-    uint32_t addr = opts.pico_addr.s_addr;
-    uint32_t port = 3333;
+    const uint32_t maddr = opts.pico_addr.s_addr;
+    uint32_t addr = 0;
+    const uint32_t mport = 3333;
+    uint32_t port = 0;
 
     if (opts.pico_cache && !page_read_set) {
         page_read_set = 1;
@@ -566,6 +568,8 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                         version = pr.pe->version;
                         if (ppb->flags & PPB_DIRTY) {
                             version++;
+                            addr = maddr;
+                            port = mport;
                         }
                         else {
                             addr = pr.pe->addr;
