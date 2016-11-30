@@ -1287,7 +1287,7 @@ int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
         if (dps->pr.seek_page(&dps->pr, addr, 1)) {        // page local
             if (dps->pr.pe->version == lpi->pr.pe->version) {   // same version
                 dps->pr.read_pages(&dps->pr, addr, nr_pages, dest);
-                return 0;
+                return 1;
             }
         }
     }
