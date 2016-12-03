@@ -30,6 +30,8 @@
 #include "protobuf.h"
 #include "images/pagemap.pb-c.h"
 
+#define MIN(a, b) a < b ? a : b;
+
 static int task_reset_dirty_track(int pid)
 {
 	int ret;
@@ -738,6 +740,16 @@ static int restore_priv_vma_content(struct pstree_item *t)
 	unsigned long va;
 	struct page_read pr;
 
+    struct page_read cpr;
+    struct iovec cpriov;
+    if (opts.pico_cache) {
+        int dfd = open(opts.pico_cache, O_RDONLY);
+	    ret = open_page_read_at(dfd, t->pid.virt, &cpr, PR_TASK);
+        if (ret <= 0)
+            return -1;
+        close(dfd);
+    }
+
 	vma = list_first_entry(vmas, struct vma_area, list);
 
 	ret = open_page_read(t->pid.virt, &pr, PR_TASK);
@@ -763,6 +775,48 @@ static int restore_priv_vma_content(struct pstree_item *t)
 		 * on demand.
 		 */
 		if (opts.lazy_pages && pagemap_lazy(pr.pe)) {
+            if (opts.pico_cache) {
+                /*
+                 * for every cached pme in the region of this pme,
+                 * if the version # matches, load it into memory
+                 */
+                uint64_t end;
+                uint32_t nrp;
+                void *p;
+                cpr.seek_page(&cpr, va, 0);
+                while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
+                    if (cpr.pe->version == pr.pe->version) {
+                        while (va >= vma->e->end) {
+                            if (vma->list.next == vmas)
+                                goto err_addr;
+                            vma = list_entry(vma->list.next, struct vma_area, list);
+                        }
+                        off = (va - vma->e->start) / PAGE_SIZE;
+                        p = decode_pointer((off) * PAGE_SIZE +
+                                vma->premmaped_addr);
+                        set_bit(off, vma->page_bitmap);
+
+                        end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
+                                    (uint64_t)(iov.iov_base+iov.iov_len));
+                        nrp = (end - cpr.cvaddr) / PAGE_SIZE;
+                        ret = cpr.read_pages(&cpr, cpr.cvaddr, nrp, p);
+                        if (ret < 0)
+                            goto err_read;
+
+                        va += nrp * PAGE_SIZE;
+                        nr_restored += nrp;
+                        bitmap_set(vma->page_bitmap, off + 1, nrp - 1);
+                    }
+                    if ((void*)(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE)) <
+                                iov.iov_base+iov.iov_len) {
+                        cpr.get_pagemap(&cpr, &cpriov);
+                    }
+                    else {
+                        cpr.seek_page(&cpr,
+                                (unsigned long)(iov.iov_base+iov.iov_len), 0);
+                    }
+                }
+            }
 			pr_debug("Lazy restore skips %ld pages at %p\n", nr_pages, iov.iov_base);
 			pr.skip_pages(&pr, iov.iov_len);
 			nr_lazy += nr_pages;
@@ -847,6 +901,8 @@ static int restore_priv_vma_content(struct pstree_item *t)
 	}
 
 err_read:
+    if (opts.pico_cache)
+        cpr.close(&cpr);
 	pr.close(&pr);
 	if (ret < 0)
 		return ret;
