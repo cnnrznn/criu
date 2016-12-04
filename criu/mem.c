@@ -785,7 +785,8 @@ static int restore_priv_vma_content(struct pstree_item *t)
                 void *p;
                 cpr.seek_page(&cpr, va, 0);
                 while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
-                    if (cpr.pe->version == pr.pe->version) {
+                    if (cpr.pe->version == pr.pe->version
+                            && cpr.pe->flags & PE_PRESENT) {
                         while (va >= vma->e->end) {
                             if (vma->list.next == vmas)
                                 goto err_addr;
