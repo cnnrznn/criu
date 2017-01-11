@@ -9,6 +9,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <linux/fs.h>
+#include <linux/mman.h>
 
 #include "asm/types.h"
 #include "list.h"
@@ -119,6 +120,8 @@ static int parse_vmflags(char *buf, struct vma_area *vma_area)
 			vma_area->e->flags |= MAP_NORESERVE;
 		else if (_vmflag_match(tok, "ht"))
 			vma_area->e->flags |= MAP_HUGETLB;
+		else if (_vmflag_match(tok, "pn"))
+			vma_area->e->flags |= MAP_PIN;
 
 		/* madvise() block */
 		if (_vmflag_match(tok, "sr"))

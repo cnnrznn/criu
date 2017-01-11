@@ -387,7 +387,7 @@ static int uffd_copy_page(struct lazy_pages_info *lpi, __u64 address,
 	int rc;
 
     if (opts.pico_restore)
-        rc = pico_get_remote_pages(lpi, address, 1, dest);
+        rc = pico_get_remote_page(lpi, address, dest);
 	else if (opts.use_page_server)
 		rc = get_remote_pages(lpi->pid, address, 1, dest);
 	else

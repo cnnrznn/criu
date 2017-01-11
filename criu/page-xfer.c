@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <linux/mman.h>
 
 #include "cr_options.h"
 #include "servicefd.h"
@@ -19,6 +20,7 @@
 #include "parasite-syscall.h"
 #include "fcntl.h"
 #include "lpi.h"
+#include "rst_info.h"
 
 #include "vma.h"
 #include "images/pstree.pb-c.h"
@@ -1257,15 +1259,36 @@ int get_remote_pages(int pid, unsigned long addr, int nr_pages, void *dest)
 	return 1;
 }
 
-int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
-                        int nr_pages, void *dest)
+int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *dest)
 {
     /*
+     * 0. if pinned, checkpoint and restore on page owner's machine
      * 1. get address and port from lpi->pr pagemap entry
      * 2. binsearch to determine if the socket to that server exists
      * 3. if not, establish tcp socket to that server
      * 4. request page as in get_remote_pages()
      */
+
+    // get vmas (from pstree item)
+    // if page is pinned (must be pinned on different machine), checkpoint and restore on target machine (IPC with criu-chamber?)
+        // write to stdout (addr) (criu-chamber will have set this up as pipe
+	struct vma_area *vma;
+	struct vm_area_list *vmas;
+	struct pstree_item *item = pstree_item_by_virt(lpi->pid);
+	vmas = &rsti(item)->vmas;
+
+    list_for_each_entry(vma, &vmas->h, list) {
+        if (vma->e->start == addr) {
+            if (vma->e->flags & MAP_PIN) {
+                //int foo = write(STDOUT_FILENO, inet_ntoa(opts.pico_addr), 15);
+                raise(SIGSTOP);
+                //if (foo < 15) { /* do nothing */ }
+            }
+            else {
+                break;
+            }
+        }
+    }
 
     if (page_servers == NULL) {
         page_servers_size = 16;
@@ -1309,7 +1332,7 @@ int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
 	int ret;
 	struct page_server_iov pi;
 
-	if (send_psi(server->sk, PS_IOV_GET, nr_pages, addr, lpi->pid))
+	if (send_psi(server->sk, PS_IOV_GET, 1, addr, lpi->pid))
 		return -1;
 
 	tcp_nodelay(server->sk, true);
@@ -1322,7 +1345,7 @@ int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
 	if (pi.cmd == PS_IOV_ZERO)
 		return 0;
 
-	if (pi.nr_pages > nr_pages)
+	if (pi.nr_pages > 1)
 		return -1;
 
 	ret = recv(server->sk, dest, PAGE_SIZE, MSG_WAITALL);

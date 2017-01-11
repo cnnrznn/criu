@@ -52,7 +52,6 @@ extern int check_parent_page_xfer(int fd_type, long id);
 
 extern int get_remote_pages(int pid, unsigned long addr, int nr_pages, void *dest);
 
-extern int pico_get_remote_pages(struct lazy_pages_info *lpi, unsigned long addr,
-                            int nr_pages, void *dest);
+extern int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *dest);
 
 #endif /* __CR_PAGE_XFER__H__ */
