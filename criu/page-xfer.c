@@ -1278,7 +1278,7 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
 	vmas = &rsti(item)->vmas;
 
     list_for_each_entry(vma, &vmas->h, list) {
-        if (vma->e->start <= addr && vma->e->stop > addr) {
+        if (vma->e->start <= addr && vma->e->end > addr) {
             if (vma->e->flags & MAP_PIN) {
                 //int foo = write(STDOUT_FILENO, inet_ntoa(opts.pico_addr), 15);
                 raise(SIGSTOP);
