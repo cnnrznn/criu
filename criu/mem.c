@@ -160,7 +160,7 @@ static int generate_iovs(struct vma_area *vma, struct page_pipe *pp, u64 *map, u
 		if (vma_entry_can_be_lazy(vma->e))
 			ppb_flags |= PPB_LAZY;
 
-        if (at[pfn] & PME_SOFT_DIRTY)
+        if (at[pfn] & PME_SOFT_DIRTY || vma->e->flags & MAP_GROWSDOWN)
             ppb_flags |= PPB_DIRTY;
 
 		/*
