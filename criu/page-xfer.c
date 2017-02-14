@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <linux/mman.h>
+#include <sys/un.h>
 
 #include "cr_options.h"
 #include "servicefd.h"
@@ -1280,9 +1281,36 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
     list_for_each_entry(vma, &vmas->h, list) {
         if (vma->e->start <= addr && vma->e->end > addr) {
             if (vma->e->flags & MAP_PIN) {
-                //int foo = write(STDOUT_FILENO, inet_ntoa(opts.pico_addr), 15);
-                raise(SIGSTOP);
-                //if (foo < 15) { /* do nothing */ }
+                // open page read, seek addr
+                open_page_read(lpi->pid, &pr, PR_TASK);
+                pr.seek_page(&pr, addr, 1);
+
+                // open socket
+                char ret;
+                struct sockaddr_un addr;
+                int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+                addr.sun_family = AF_UNIX;
+                sprintf(addr.sun_path, "/pico");
+                if (connect(sock, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) == -1) {
+                    perror("connect");
+                    goto sleep;
+                }
+                struct in_addr inaddr;
+                inaddr.s_addr = pr.pe->addr;
+                if (write(sock, inet_ntoa(inaddr), 15) < 0) {
+                    pr_err("write to pico socket");
+                    goto sleep;
+                }
+                if (read(sock, &ret, 1) < 0) {
+                    pr_err("read from pico socket");
+                    goto sleep;
+                }
+sleep:
+                // cleanup
+                pr.close(&pr);
+                close(sock);
+
+                sleep(3600);
             }
             else {
                 break;
