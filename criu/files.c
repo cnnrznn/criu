@@ -53,9 +53,6 @@
 #define FDESC_HASH_SIZE	64
 static struct hlist_head file_desc_hash[FDESC_HASH_SIZE];
 
-static int fds_dumped[1024];
-static int fds_dumped_last;
-
 int prepare_shared_fdinfo(void)
 {
 	int i;
@@ -273,64 +270,10 @@ int do_dump_gen_file(struct fd_parms *p, int lfd,
 	e.id	= make_gen_id(p);
 	e.fd	= p->fd;
 	e.flags = p->fd_flags;
-    e.pico_addr = opts.pico_addr.s_addr;
-
-    fds_dumped[fds_dumped_last] = e.fd;
-    fds_dumped_last++;
 
 	ret = fd_id_generate(p->pid, &e, p);
-	if (ret == 1) {/* new ID generated */
-        if (opts.pico_pin_sks && S_ISSOCK(p->stat.st_mode)) {
-#define CONTAINS_SK     1
-            // create socket to dummy
-            int sk = socket(AF_UNIX, SOCK_STREAM, 0);
-            struct sockaddr_un skaddr = { 0 };
-            skaddr.sun_family = AF_UNIX;
-            strcpy(skaddr.sun_path, opts.pico_pin_sks); // TODO pico_pin_sks/real_pid (per process dummy process)
-
-            if (connect(sk, (struct sockaddr *)&skaddr, sizeof(skaddr))) {
-                pr_err("connect");
-                return -1;
-            }
-
-            // create msg for dummy
-            unsigned long controllen = CMSG_LEN(sizeof(int));
-            struct msghdr msg = { 0 };
-            struct cmsghdr *cmptr = malloc(controllen);
-            int buf[2] = { 0 };
-            struct iovec iov[1];
-
-            iov[0].iov_base = buf;
-            iov[0].iov_len = sizeof(buf);
-            msg.msg_iov = iov;
-            msg.msg_iovlen = 1;
-            msg.msg_name = NULL;
-            msg.msg_namelen = 0;
-            msg.msg_control = cmptr;
-            msg.msg_controllen = controllen;
-            cmptr->cmsg_level   = SOL_SOCKET;
-            cmptr->cmsg_type    = SCM_RIGHTS;
-            cmptr->cmsg_len     = controllen;
-
-            buf[0] = CONTAINS_SK;
-            buf[1] = p->fd;
-            *(int*)CMSG_DATA(cmptr) = lfd;
-
-            // send fd to dummy
-            if (sendmsg(sk, &msg, 0) < 0) {
-                pr_err("sendmsg");
-                free(cmptr);
-                return -1;
-            }
-
-            // cleanup
-            close(sk);
-            free(cmptr);
-        }
-        else {
-            ret = ops->dump(lfd, e.id, p);
-        }
-    }
+	if (ret == 1) /* new ID generated */
+		ret = ops->dump(lfd, e.id, p);
 
 	if (ret < 0)
 		return ret;
@@ -568,7 +511,7 @@ int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 {
 	int *lfds = NULL;
 	struct cr_img *img = NULL;
-	struct fd_opts *fdopts = NULL;
+	struct fd_opts *opts = NULL;
 	int i, ret = -1;
 	int off, nr_fds = min((int) PARASITE_MAX_FDS, dfds->nr_fds);
 
@@ -580,16 +523,13 @@ int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 	if (!lfds)
 		goto err;
 
-	fdopts = xmalloc(nr_fds * sizeof(struct fd_opts));
-	if (!fdopts)
+	opts = xmalloc(nr_fds * sizeof(struct fd_opts));
+	if (!opts)
 		goto err;
 
 	img = open_image(CR_FD_FDINFO, O_DUMP, item->ids->files_id);
 	if (!img)
 		goto err;
-
-    memset(fds_dumped, -1, 1024);
-    fds_dumped_last = 0;
 
 	ret = 0; /* Don't fail if nr_fds == 0 */
 	for (off = 0; off < dfds->nr_fds; off += nr_fds) {
@@ -597,53 +537,24 @@ int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 			nr_fds = dfds->nr_fds - off;
 
 		ret = parasite_drain_fds_seized(ctl, dfds, nr_fds,
-							off, lfds, fdopts);
+							off, lfds, opts);
 		if (ret)
 			goto err;
 
 		for (i = 0; i < nr_fds; i++) {
 			ret = dump_one_file(&item->pid, dfds->fds[i + off],
-						lfds[i], fdopts + i, img, ctl);
+						lfds[i], opts + i, img, ctl);
 			close(lfds[i]);
 			if (ret)
 				break;
 		}
 	}
 
-    if (opts.pico_cache) {
-        // open old fdinfo
-        int dfd = open(opts.pico_cache, O_RDONLY);
-        struct cr_img *oldimg = open_image_at(dfd, O_RSTR, item->ids->files_id);
-        close(dfd);
-
-        // dump old fds that are not present
-        while (1) {
-            FdinfoEntry *e;
-
-            ret = pb_read_one_eof(oldimg, &e, PB_FDINFO);
-            if (ret <= 0)
-                break;
-
-            int i;
-            for (i=0; i<fds_dumped_last; i++) {
-                if (fds_dumped[i] == e->fd) {
-                    goto found;
-                }
-            }
-	        pb_write_one(img, &e, PB_FDINFO);
-
-found:
-            fdinfo_entry__free_unpacked(e, NULL);
-        }
-
-        close_image(oldimg);
-    }
-
 	pr_info("----------------------------------------\n");
 err:
 	if (img)
 		close_image(img);
-	xfree(fdopts);
+	xfree(opts);
 	xfree(lfds);
 	return ret;
 }

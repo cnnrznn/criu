@@ -119,10 +119,9 @@ struct cr_options {
 
     bool            meta_dump;
     bool            disk_serve;
-    char*           pico_cache;
+    char            *pico_cache;
     bool            pico_restore;
     struct in_addr  pico_addr;
-    char*           pico_pin_sks;
 };
 
 extern struct cr_options opts;

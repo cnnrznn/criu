@@ -285,7 +285,6 @@ int main(int argc, char *argv[], char *envp[])
         { "pico-cache",         required_argument,  0, 2002 },
         { "pico-restore",       no_argument,        0, 2003 },
         { "pico-addr",          required_argument,  0, 2004 },
-        { "pico-pin-sks",       required_argument,  0, 2005 },
 		{ },
 	};
 
@@ -619,9 +618,6 @@ int main(int argc, char *argv[], char *envp[])
         case 2004:
             if (!inet_aton(optarg, &opts.pico_addr))
                 return -1;
-            break;
-        case 2005:
-            opts.pico_pin_sks = optarg;
             break;
 		case 'V':
 			pr_msg("Version: %s\n", CRIU_VERSION);
