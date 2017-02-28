@@ -23,6 +23,8 @@
 #include "sockets.h"
 #include "sk-inet.h"
 
+#include "pico-defs.h"
+
 #define PB_ALEN_INET	1
 #define PB_ALEN_INET6	4
 
@@ -93,7 +95,7 @@ static void show_one_inet_img(const char *act, const InetSkEntry *e)
 		e->state, src_addr);
 }
 
-static int can_dump_ipproto(int ino, int proto)
+int can_dump_ipproto(int ino, int proto)
 {
 	/* Make sure it's a proto we support */
 	switch (proto) {
@@ -179,7 +181,7 @@ static int can_dump_inet_sk(const struct inet_sk_desc *sk)
 	return 1;
 }
 
-static struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto)
+struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto)
 {
 	struct inet_sk_desc *sk;
 	char address;
@@ -239,7 +241,7 @@ err:
 	return NULL;
 }
 
-static int dump_ip_opts(int sk, IpOptsEntry *ioe)
+int dump_ip_opts(int sk, IpOptsEntry *ioe)
 {
 	int ret = 0;
 
@@ -472,6 +474,9 @@ static int collect_one_inetsk(void *o, ProtobufCMessage *base, struct cr_img *i)
 	ii->port = port_add(ii->ie->type, ii->ie->src_port);
 	if (ii->port == NULL)
 		return -1;
+
+    if (opts.pico_pin_inet_sks)
+	    return file_desc_add(&ii->d, ii->ie->id, &pico_inet_desc_ops);
 
 	return file_desc_add(&ii->d, ii->ie->id, &inet_desc_ops);
 }

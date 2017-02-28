@@ -50,6 +50,12 @@
 
 #include "plugin.h"
 
+#include "array.h"
+#include "binsearch.h"
+#include "pico-defs.h"
+
+struct fdinfo_list_entry *currFle;
+
 #define FDESC_HASH_SIZE	64
 static struct hlist_head file_desc_hash[FDESC_HASH_SIZE];
 
@@ -509,9 +515,14 @@ static int dump_one_file(struct pid *pid, int fd, int lfd, struct fd_opts *opts,
 int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 		struct parasite_drain_fd *dfds)
 {
+    int fdarr_data[1024] = { 0 };
+    int fdarr_size = 0;
+    array fdarr;
+    array_init(&fdarr, 1024, comp_fds); // BUG fixed size may cause a bug
+
 	int *lfds = NULL;
 	struct cr_img *img = NULL;
-	struct fd_opts *opts = NULL;
+	struct fd_opts *fdopts = NULL;
 	int i, ret = -1;
 	int off, nr_fds = min((int) PARASITE_MAX_FDS, dfds->nr_fds);
 
@@ -523,8 +534,8 @@ int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 	if (!lfds)
 		goto err;
 
-	opts = xmalloc(nr_fds * sizeof(struct fd_opts));
-	if (!opts)
+	fdopts = xmalloc(nr_fds * sizeof(struct fd_opts));
+	if (!fdopts)
 		goto err;
 
 	img = open_image(CR_FD_FDINFO, O_DUMP, item->ids->files_id);
@@ -537,13 +548,16 @@ int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 			nr_fds = dfds->nr_fds - off;
 
 		ret = parasite_drain_fds_seized(ctl, dfds, nr_fds,
-							off, lfds, opts);
+							off, lfds, fdopts);
 		if (ret)
 			goto err;
 
 		for (i = 0; i < nr_fds; i++) {
+            fdarr_data[fdarr_size] = dfds->fds[i + off];
+            fdarr_size++;
+
 			ret = dump_one_file(&item->pid, dfds->fds[i + off],
-						lfds[i], opts + i, img, ctl);
+						lfds[i], fdopts + i, img, ctl);
 			close(lfds[i]);
 			if (ret)
 				break;
@@ -552,9 +566,14 @@ int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 
 	pr_info("----------------------------------------\n");
 err:
+    // dump missing fds from pico_cache, create inetsk entries
+    if (opts.pico_pin_inet_sks)
+        pico_dump_cache_inet_sks(&fdarr, fdarr_data, fdarr_size, item, img);
+
+    array_free(&fdarr);
 	if (img)
 		close_image(img);
-	xfree(opts);
+	xfree(fdopts);
 	xfree(lfds);
 	return ret;
 }
@@ -1038,7 +1057,14 @@ static int open_fd(int pid, struct fdinfo_list_entry *fle)
 	if (fle != file_master(d))
 		return 0;
 
+    if (opts.pico_pin_inet_sks)
+        currFle = fle;
+
 	new_fd = d->ops->open(d);
+
+    if (opts.pico_pin_inet_sks && new_fd == PICO_PINNED_FD)
+        return serve_out_fd(pid, fle->fe->fd, d);
+
 	if (new_fd < 0)
 		return -1;
 

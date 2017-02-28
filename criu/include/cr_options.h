@@ -117,11 +117,12 @@ struct cr_options {
 	bool			deprecated_ok;
 	bool			display_stats;
 
-    bool            meta_dump;
-    bool            disk_serve;
-    char            *pico_cache;
-    bool            pico_restore;
-    struct in_addr  pico_addr;
+    bool            meta_dump;          /* Dump lazy pagemap/pages as well as full */
+    bool            disk_serve;         /* Page server should serve pages from checkpoint on disk */
+    char*           pico_cache;         /* path to previous checkpoint */
+    bool            pico_restore;       /* use multiple page servers, pico_cache */
+    struct in_addr  pico_addr;          /* IP that identifies the current machine */
+    char*           pico_pin_inet_sks;  /* path to socket maintainer executable */
 };
 
 extern struct cr_options opts;

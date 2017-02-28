@@ -86,4 +86,8 @@ struct rst_tcp_sock {
 	bool	reuseaddr;
 };
 
+int can_dump_ipproto(int ino, int proto);
+struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto);
+int dump_ip_opts(int sk, IpOptsEntry *ioe);
+
 #endif /* __CR_SK_INET_H__ */

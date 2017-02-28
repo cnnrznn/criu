@@ -87,6 +87,7 @@ obj-y			+= uffd.o
 obj-y           += array.o
 obj-y           += quicksort.o
 obj-y           += binsearch.o
+obj-y           += pico-defs.o
 
 ifeq ($(VDSO),y)
 obj-y			+= pie-util-vdso.o

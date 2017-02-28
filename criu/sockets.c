@@ -9,6 +9,7 @@
 #include <string.h>
 #include <netinet/in.h>
 
+#include "cr_options.h"
 #include "libnetlink.h"
 #include "sockets.h"
 #include "unix_diag.h"
@@ -21,6 +22,8 @@
 #include "namespaces.h"
 #include "net.h"
 #include "fs-magic.h"
+
+#include "pico-defs.h"
 
 #ifndef SOCK_DIAG_BY_FAMILY
 #define SOCK_DIAG_BY_FAMILY 20
@@ -563,6 +566,8 @@ int dump_socket(struct fd_parms *p, int lfd, struct cr_img *img)
 		break;
 	case AF_INET:
 		ops = &inet_dump_ops;
+        if (opts.pico_pin_inet_sks)
+            ops = &pico_inet_dump_ops;
 		break;
 	case AF_INET6:
 		ops = &inet6_dump_ops;

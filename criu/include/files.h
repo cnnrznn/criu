@@ -201,4 +201,6 @@ int dup_fle(struct pstree_item *task, struct fdinfo_list_entry *ple,
 
 extern int open_transport_socket(void);
 
+extern struct fdinfo_list_entry *currFle;
+
 #endif /* __CR_FILES_H__ */
