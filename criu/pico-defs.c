@@ -145,7 +145,7 @@ int do_pico_dump_one_inet_fd(int lfd, u32 id, const struct fd_parms *p, int fami
     cmptr->cmsg_len   = CMSG_LEN(sizeof(int));
     *(int*)CMSG_DATA(cmptr) = lfd;
     buf[0] = CONTAINS_SK;
-    buf[1] = id;
+    buf[1] = p->fd;
 
     if (sendmsg(rsk, &msg, 0) < 0) {
         pr_err("sendmsg");
@@ -207,7 +207,7 @@ static int pico_open_inet_sk(struct file_desc *d)
     msg.msg_control = cmptr;
     msg.msg_controllen = 0;
     buf[0] = REQUEST_SK;
-    buf[1] = d->id;
+    buf[1] = currFle->fe->fd;
     pr_debug("Requesting fd %d\n", buf[1]);
 
     if (sendmsg(rsk, &msg, 0) < 0) {
