@@ -115,49 +115,7 @@ int do_pico_dump_one_inet_fd(int lfd, u32 id, const struct fd_parms *p, int fami
 	sk->sd.already_dumped = 1;
 	sk->cpt_reuseaddr = skopts.reuseaddr;
 
-    // send file descriptor to sk-holder
-    int rsk = socket(AF_UNIX, SOCK_STREAM, 0);
-    struct sockaddr_un rskaddr = { 0 };
-    rskaddr.sun_family = AF_UNIX;
-    strcpy(rskaddr.sun_path, opts.pico_pin_inet_sks);
-
-    if (connect(rsk, (struct sockaddr *)&rskaddr, sizeof(rskaddr))) {
-        pr_err("connect");
-        goto connerr;
-    }
-
-    struct msghdr msg = { 0 };
-    struct cmsghdr *cmptr = malloc(CMSG_LEN(sizeof(int)));
-    memset(cmptr, 0, CMSG_LEN(sizeof(int)));
-    int buf[2] = { 0 };
-    struct iovec iov[1];
-
-    iov[0].iov_base = buf;
-    iov[0].iov_len = sizeof(buf);
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-    msg.msg_name = NULL;
-    msg.msg_namelen = 0;
-    msg.msg_control = cmptr;
-    msg.msg_controllen = CMSG_LEN(sizeof(int));
-    cmptr->cmsg_level = SOL_SOCKET;
-    cmptr->cmsg_type  = SCM_RIGHTS;
-    cmptr->cmsg_len   = CMSG_LEN(sizeof(int));
-    *(int*)CMSG_DATA(cmptr) = lfd;
-    buf[0] = CONTAINS_SK;
-    buf[1] = p->fd;
-
-    if (sendmsg(rsk, &msg, 0) < 0) {
-        pr_err("sendmsg");
-        goto senderr;
-    }
-
     err = 0;
-
-senderr:
-    free(cmptr);
-connerr:
-    close(rsk);
 
 err:
 	release_skopts(&skopts);
