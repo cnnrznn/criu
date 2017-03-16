@@ -56,7 +56,7 @@ open_comm_sock()
 
     psock = real_socket(AF_UNIX, SOCK_STREAM, 0);
     if (real_connect(psock, (struct sockaddr *)&paddr, paddr_len) == -1) {
-        perror("migrate.c: connect");
+        perror("connect");
         exit(1);
     }
 }
@@ -117,19 +117,6 @@ close_fd(int fd)
     open_comm_sock();
 
     real_write(psock, CLOSE_FD, 1);
-    char buf[15] = { 0 };
-    sprintf(buf, "%d", fd);
-    real_write(psock, buf, 15);
-    real_close(psock);
-}
-
-void
-fd_ready(int fd)
-{ libc_init();
-
-    open_comm_sock();
-
-    real_write(psock, FD_READY, 1);
     char buf[15] = { 0 };
     sprintf(buf, "%d", fd);
     real_write(psock, buf, 15);

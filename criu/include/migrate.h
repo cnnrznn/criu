@@ -5,7 +5,6 @@
 #define MIGRATE_IP      "\x01"
 #define MIGRATE_FD      "\x02"
 #define CLOSE_FD        "\x03"
-#define FD_READY        "\x04"
 
 #define PICOMAN_ADDR "/tmp/pico"
 
@@ -20,8 +19,5 @@ check_fd(int fd);
 
 void
 close_fd(int fd);
-
-void
-fd_ready(int fd);
 
 #endif /* _CR_PICO_MIGRATE_H */
