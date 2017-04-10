@@ -120,8 +120,10 @@ static int parse_vmflags(char *buf, struct vma_area *vma_area)
 			vma_area->e->flags |= MAP_NORESERVE;
 		else if (_vmflag_match(tok, "ht"))
 			vma_area->e->flags |= MAP_HUGETLB;
-		else if (_vmflag_match(tok, "pn"))
+		else if (_vmflag_match(tok, "pn")) {
 			vma_area->e->flags |= MAP_PIN;
+            vma_area->e->pico_addr = opts.pico_addr.s_addr;
+        }
 
 		/* madvise() block */
 		if (_vmflag_match(tok, "sr"))

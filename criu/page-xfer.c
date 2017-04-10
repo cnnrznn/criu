@@ -1282,15 +1282,12 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
     list_for_each_entry(vma, &vmas->h, list) {
         if (vma->e->start <= addr && vma->e->end > addr) {
             if (vma->e->flags & MAP_PIN) {
-                // open page read, seek addr
-                open_page_read(lpi->pid, &pr, PR_TASK);
-                pr.seek_page(&pr, addr, 1);
-
                 // call migration library
                 struct in_addr inaddr;
-                inaddr.s_addr = pr.pe->addr;
+                inaddr.s_addr = vma->e->pico_addr;
 
                 migrate_ip(inet_ntoa(inaddr));
+                goto jail; // do not pass go, do not collect $200
             }
             else {
                 break;
@@ -1304,6 +1301,7 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
         array_init(&page_servers_arr, 16, comp_page_servers);
     }
 
+    pr_debug("CONNOR: trying to find page with page read\n");
     lpi->pr.reset(&lpi->pr);
     lpi->pr.seek_page(&lpi->pr, addr, 1);
 
@@ -1360,5 +1358,6 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
 	if (ret != PAGE_SIZE)
 		return -1;
 
+jail:
 	return 1;
 }
