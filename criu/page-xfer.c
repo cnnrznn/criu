@@ -1273,7 +1273,8 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
 
     // get vmas (from pstree item)
     // if page is pinned (must be pinned on different machine), checkpoint and restore on target machine (IPC with criu-chamber?)
-        // write to stdout (addr) (criu-chamber will have set this up as pipe
+    // write to stdout (addr) (criu-chamber will have set this up as pipe
+    int ret;
 	struct vma_area *vma;
 	struct vm_area_list *vmas;
 	struct pstree_item *item = pstree_item_by_virt(lpi->pid);
@@ -1303,7 +1304,10 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
 
     pr_debug("CONNOR: trying to find page with page read\n");
     lpi->pr.reset(&lpi->pr);
-    lpi->pr.seek_page(&lpi->pr, addr, 1);
+    ret = lpi->pr.seek_page(&lpi->pr, addr, 1);
+
+    if (!ret)
+        return 0;
 
     if (page_servers_ct == 0) { // fist entry
         page_servers[0].addr = lpi->pr.pe->addr;
@@ -1335,7 +1339,6 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
     }
 
     // copy get_remote_pages()
-	int ret;
 	struct page_server_iov pi;
 
 	if (send_psi(server->sk, PS_IOV_GET, 1, addr, lpi->pid))
