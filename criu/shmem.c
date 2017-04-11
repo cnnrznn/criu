@@ -624,7 +624,7 @@ static int dump_pages(struct page_pipe *pp, struct page_xfer *xfer, void *addr)
 			return -1;
 		}
 
-	return page_xfer_dump_pages(xfer, pp, (unsigned long)addr, true);
+	return shared_page_xfer_dump_pages(xfer, pp, (unsigned long)addr, true);
 }
 
 static int dump_one_shmem(struct shmem_info *si)
