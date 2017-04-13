@@ -613,6 +613,9 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                 while (size_dumped < iov.iov_len) {
                     if (tmpiov.iov_base < (void*)pr.cvaddr) {   // only in new
                         end = MIN(iov.iov_base + iov.iov_len, (void*)pr.cvaddr);
+                        version = 0;
+                        addr = maddr;
+                        port = mport;
                     }
                     else {                                      // overlap
                         end = MIN(iov.iov_base + iov.iov_len, ciov.iov_base + ciov.iov_len)
