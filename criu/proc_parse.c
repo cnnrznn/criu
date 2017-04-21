@@ -123,6 +123,7 @@ static int parse_vmflags(char *buf, struct vma_area *vma_area)
 		else if (_vmflag_match(tok, "pn")) {
 			vma_area->e->flags |= MAP_PIN;
             vma_area->e->pico_addr = opts.pico_addr.s_addr;
+            vma_area->e->has_pico_addr = true;
         }
 
 		/* madvise() block */
