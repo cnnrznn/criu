@@ -1359,6 +1359,9 @@ int pico_get_remote_page(struct lazy_pages_info *lpi, unsigned long addr, void *
     if (!ret)
         return 0;
 
+    if (pagemap_zero(lpi->pr.pe))
+        return 0;
+
     if (page_servers_ct == 0) { // fist entry
         page_servers[0].addr = lpi->pr.pe->addr;
         page_servers[0].sk = pico_conn_server(lpi->pr.pe->addr, lpi->pr.pe->port);
