@@ -364,17 +364,23 @@ void pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, str
         // 2. if fdinfo->fd has not been dumped (is not in fdarr):
         int other = e->fd;
         if (!binsearch(fdarr, &other, 0, fdarr->size-1)) {
-            // 2a. dump old fdinfo
-            pb_write_one(img, e, PB_FDINFO);
-            pr_debug("CONNOR: copied old fdinfo!\n");
-
             // 2b. dump old inetsk entry
             InetSkEntry other_inet;
             other_inet.id = e->id;
             InetSkEntry *ie = binsearch(&skarr, &other_inet, 0, skarr.size-1);
-            pb_write_one(img_from_set(glob_imgset, CR_FD_INETSK), ie, PB_INET_SK);
-            // TODO BUG only dump InetSkEntry once
-            pr_warn("CONNOR: copied old inetsk!\n");
+
+            if (ie->pico_addr != opts.pico_addr.s_addr) {
+                pb_write_one(img_from_set(glob_imgset, CR_FD_INETSK), ie, PB_INET_SK);
+                // TODO BUG only dump InetSkEntry once
+                pr_warn("CONNOR: copied old inetsk!\n");
+
+                // 2a. dump old fdinfo
+                pb_write_one(img, e, PB_FDINFO);
+                pr_debug("CONNOR: copied old fdinfo!\n");
+            }
+            else {
+                pr_debug("CONNOR: skipping cached fd\n");
+            }
         }
 
 		fdinfo_entry__free_unpacked(e, NULL);
