@@ -1063,7 +1063,7 @@ static int open_fd(int pid, struct fdinfo_list_entry *fle)
 	new_fd = d->ops->open(d);
 
     if (opts.pico_pin_inet_sks && new_fd == PICO_PINNED_FD)
-        return serve_out_fd(pid, fle->fe->fd, d);
+        return 0;
 
 	if (new_fd < 0)
 		return -1;
