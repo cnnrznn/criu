@@ -741,7 +741,6 @@ static int restore_priv_vma_content(struct pstree_item *t)
 	struct page_read pr;
 
     struct page_read cpr;
-    struct iovec cpriov;
     if (opts.pico_cache) {
         int dfd = open(opts.pico_cache, O_RDONLY);
 	    ret = open_page_read_at(dfd, t->pid.virt, &cpr, PR_TASK);
@@ -785,36 +784,32 @@ static int restore_priv_vma_content(struct pstree_item *t)
                 void *p;
                 cpr.seek_page(&cpr, va, 0);
                 while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
+                    end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
+                                (uint64_t)(iov.iov_base+iov.iov_len));
+
                     if (cpr.pe->version == pr.pe->version
                             && cpr.pe->flags & PE_PRESENT) {
-                        while (va >= vma->e->end) {
+                        while (cpr.cvaddr >= vma->e->end) {
                             if (vma->list.next == vmas)
                                 goto err_addr;
                             vma = list_entry(vma->list.next, struct vma_area, list);
                         }
-                        off = (va - vma->e->start) / PAGE_SIZE;
+                        off = (cpr.cvaddr - vma->e->start) / PAGE_SIZE;
                         p = decode_pointer((off) * PAGE_SIZE +
                                 vma->premmaped_addr);
-                        set_bit(off, vma->page_bitmap);
 
-                        end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
-                                    (uint64_t)(iov.iov_base+iov.iov_len));
                         nrp = (end - cpr.cvaddr) / PAGE_SIZE;
+
+                        pr_debug("CONNOR: restoring %d pages at 0x%lx from cache\n", nrp, cpr.cvaddr);
+
                         ret = cpr.read_pages(&cpr, cpr.cvaddr, nrp, p);
                         if (ret < 0)
                             goto err_read;
 
-                        va += nrp * PAGE_SIZE;
                         nr_restored += nrp;
-                        bitmap_set(vma->page_bitmap, off + 1, nrp - 1);
-                    }
-                    if ((void*)(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE)) <
-                                iov.iov_base+iov.iov_len) {
-                        cpr.get_pagemap(&cpr, &cpriov);
                     }
                     else {
-                        cpr.seek_page(&cpr,
-                                (unsigned long)(iov.iov_base+iov.iov_len), 0);
+                        cpr.skip_pages(&cpr, end - cpr.cvaddr);
                     }
                 }
             }
