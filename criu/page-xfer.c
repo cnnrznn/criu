@@ -502,6 +502,52 @@ struct page_read pr;
 char page_read_set = 0;
 struct iovec ciov;
 
+int pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
+{
+    struct iovec vmaiov, ciov;
+    struct vma_area *vma = NULL;
+
+    ciov.iov_base = (void*) pr.pe->vaddr;
+    ciov.iov_len  = pr.pe->nr_pages * PAGE_SIZE;
+
+    vma = list_entry(xfer->vma_area_list->h.next, typeof(*vma), list);
+    vmaiov.iov_base = (void*)vma->e->start;
+
+    do {
+        // align vma
+        while (vmaiov.iov_base < (void*)pr.cvaddr) {
+            if ((void*)vma->e->end <= (void*)pr.cvaddr) {
+                vma = list_entry(vma->list.next, typeof(*vma), list);
+                vmaiov.iov_base = (void*)vma->e->start;
+            }
+            else {
+                vmaiov.iov_base = (void*)pr.cvaddr;
+            }
+        }
+
+        // dump all sections of pagemap within vmas
+        while (vmaiov.iov_base < ciov.iov_base + ciov.iov_len) {
+            void *vmaend = MIN((void*)vma->e->end, ciov.iov_base + ciov.iov_len);
+            vmaiov.iov_len = vmaend - vmaiov.iov_base;
+
+            // dump pagemap entry
+            xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version,
+                            pr.pe->addr, pr.pe->port);
+
+            if ((void*)vma->e->end <= ciov.iov_base + ciov.iov_len) {
+                vma = list_entry(vma->list.next, typeof(*vma), list);
+                vmaiov.iov_base = (void*)vma->e->start;
+            }
+            else {
+                vmaiov.iov_base = ciov.iov_base + ciov.iov_len;
+            }
+        }
+
+    } while (pr.get_pagemap(&pr, &ciov));
+
+    return 0;
+}
+
 int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 			 unsigned long off, bool dump_lazy)
 {

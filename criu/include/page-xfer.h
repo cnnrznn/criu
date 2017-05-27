@@ -44,6 +44,7 @@ extern int page_xfer_dump_pages(struct page_xfer *, struct page_pipe *,
 				unsigned long off, bool dump_lazy);
 extern int shared_page_xfer_dump_pages(struct page_xfer *, struct page_pipe *,
 				unsigned long off, bool dump_lazy);
+extern int pico_dump_end_cached_pagemaps(struct page_xfer *);
 extern int connect_to_page_server(void);
 extern int disconnect_from_page_server(void);
 

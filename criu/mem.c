@@ -411,6 +411,9 @@ again:
 	if (ret)
 		goto out_xfer;
 
+    if (opts.pico_cache)
+        pico_dump_end_cached_pagemaps(&xfer);
+
 	timing_stop(TIME_MEMDUMP);
 
 	/*
