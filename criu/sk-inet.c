@@ -200,7 +200,7 @@ struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto)
 			pr_perror("Unexpected error returned from unconnected socket");
 			goto err;
 		}
-	} else if (ret == 0) {
+	} else if (ret == 0 && !opts.pico_pin_inet_sks) {
 		pr_err("Name resolved on unconnected socket\n");
 		goto err;
 	}
@@ -222,7 +222,8 @@ struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto)
 			goto err;
 		}
 
-		if (info.tcpi_state != TCP_CLOSE) {
+		if (info.tcpi_state != TCP_CLOSE &&
+                !opts.pico_pin_inet_sks) {
 			pr_err("Socket state %d obtained but expected %d\n",
 			       info.tcpi_state, TCP_CLOSE);
 			goto err;
