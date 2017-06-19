@@ -507,6 +507,10 @@ int pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
     struct iovec vmaiov, ciov;
     struct vma_area *vma = NULL;
 
+    // if all cached pme's have been dumped
+    if (pr.curr_pme >= pr.nr_pmes)
+        return 0;
+
     ciov.iov_base = (void*) pr.pe->vaddr;
     ciov.iov_len  = pr.pe->nr_pages * PAGE_SIZE;
 
