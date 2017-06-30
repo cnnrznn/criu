@@ -30,6 +30,8 @@
 #include "protobuf.h"
 #include "images/pagemap.pb-c.h"
 
+#include "pico-defs.h"
+
 #define MIN(a, b) a < b ? a : b;
 
 static int task_reset_dirty_track(int pid)
@@ -675,6 +677,13 @@ static int map_private_vma(struct pstree_item *t,
 		*pvma = list_entry(p->list.next, struct vma_area, list);
 	}
 
+    /*int madr = madvise(addr, size, MADV_RANDOM);
+    //pr_debug("CONNOR: 0x%lx, 0x%lx\n", (unsigned long)addr, size);
+    if (madr < 0) {
+        pr_err("CONNOR: failed to madvise(..., MADV_RANDOM)\n");
+        exit(1);
+    }*/
+
 	vma->premmaped_addr = (unsigned long) addr;
 	pr_debug("\tpremap %#016"PRIx64"-%#016"PRIx64" -> %016lx\n",
 		vma->e->start, vma->e->end, (unsigned long)addr);
@@ -744,6 +753,7 @@ static int restore_priv_vma_content(struct pstree_item *t)
 	struct page_read pr;
 
     struct page_read cpr;
+    struct pico_page_list *plhead = NULL;
     if (opts.pico_cache) {
         int dfd = open(opts.pico_cache, O_RDONLY);
 	    ret = open_page_read_at(dfd, t->pid.virt, &cpr, PR_TASK);
@@ -785,25 +795,26 @@ static int restore_priv_vma_content(struct pstree_item *t)
                 uint64_t end;
                 uint32_t nrp;
                 void *p;
-                cpr.seek_page(&cpr, va, 0);
+                cpr.seek_page(&cpr, va, 1);
                 while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
                     end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
                                 (uint64_t)(iov.iov_base+iov.iov_len));
 
+                    while (cpr.cvaddr >= vma->e->end) {
+                        if (vma->list.next == vmas)
+                            goto err_addr;
+                        vma = list_entry(vma->list.next, struct vma_area, list);
+                    }
+                    off = (cpr.cvaddr - vma->e->start) / PAGE_SIZE;
+                    p = decode_pointer((off) * PAGE_SIZE +
+                            vma->premmaped_addr);
+
+                    nrp = (end - cpr.cvaddr) / PAGE_SIZE;
+
                     if (cpr.pe->version == pr.pe->version
                             && cpr.pe->flags & PE_PRESENT) {
-                        while (cpr.cvaddr >= vma->e->end) {
-                            if (vma->list.next == vmas)
-                                goto err_addr;
-                            vma = list_entry(vma->list.next, struct vma_area, list);
-                        }
-                        off = (cpr.cvaddr - vma->e->start) / PAGE_SIZE;
-                        p = decode_pointer((off) * PAGE_SIZE +
-                                vma->premmaped_addr);
-
-                        nrp = (end - cpr.cvaddr) / PAGE_SIZE;
-
-                        pr_debug("CONNOR: restoring %d pages at 0x%lx from cache\n", nrp, cpr.cvaddr);
+                        pr_debug("CONNOR: restoring %d pages at 0x%lx into 0x%lx from cache\n",
+                                    nrp, cpr.cvaddr, (unsigned long)p);
 
                         ret = cpr.read_pages(&cpr, cpr.cvaddr, nrp, p);
                         if (ret < 0)
@@ -812,6 +823,12 @@ static int restore_priv_vma_content(struct pstree_item *t)
                         nr_restored += nrp;
                     }
                     else {
+                        struct pico_page_list *plent = malloc(sizeof(struct pico_page_list));
+                        plent->addr = (unsigned long)p;
+                        plent->size = end - cpr.cvaddr;
+                        plent->next = plhead;
+                        plhead = plent;
+
                         cpr.skip_pages(&cpr, end - cpr.cvaddr);
                     }
                 }
@@ -897,7 +914,18 @@ static int restore_priv_vma_content(struct pstree_item *t)
 			}
 
 		}
-	}
+    }
+
+    while (plhead != NULL) {
+        //pr_debug("CONNOR: 0x%lx\n", plhead->addr);
+        int madr = madvise((void*)plhead->addr, plhead->size, MADV_DONTNEED);
+        if (madr < 0) {
+            pr_err("CONNOR: madvise(..., MADV_DONTNEED) failed\n");
+            exit(1);
+        }
+
+        plhead = plhead->next;
+    }
 
 err_read:
     if (opts.pico_cache)
