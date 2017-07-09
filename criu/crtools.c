@@ -495,6 +495,14 @@ int main(int argc, char *argv[], char *envp[])
 		{ "verbosity",			optional_argument,	0, 'v'	},
 		{ "config",			required_argument,	0, 1089},
 		{ "no-default-config",		no_argument,		0, 1090},
+
+        { "pico-dump",          no_argument,        0, 2000},
+        { "disk-serve",         no_argument,        0, 2001},
+        { "pico-cache",         required_argument,  0, 2002},
+        { "pico-restore",       no_argument,        0, 2003},
+        { "pico-addr",          required_argument,  0, 2004},
+        { "pico-pin-inet-sks",  required_argument,  0, 2005},
+
 		{ },
 	};
 
@@ -820,6 +828,25 @@ int main(int argc, char *argv[], char *envp[])
 				return 1;
 			}
 			break;
+        case 2000:
+            opts.pico_dump = true;
+            break;
+        case 2001:
+            opts.disk_serve = true;
+            break;
+        case 2002:
+            opts.pico_cache = optarg;
+            break;
+        case 2003:
+            opts.pico_restore = true;
+            break;
+        case 2004:
+            if (!inet_aton(optarg, &opts.pico_addr))
+                return -1;
+            break;
+        case 2005:
+            opts.pico_pin_inet_sks = optarg;
+            break;
 		case 1089:
 			break;
 		case 1090:
