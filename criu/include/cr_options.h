@@ -129,7 +129,7 @@ struct cr_options {
     bool            pico_dump;          /* dump lazy pagemap/pages as well as full */
     bool            disk_serve;         /* serve lazy pages from checkpoint on disk */
     char*           pico_cache;         /* path to previous checkpoint */
-    bool            pico_restore;       /* get pages from multiple servers */
+    bool            pico_restore;       /* use multiple servers, pico_cache */
     struct in_addr  pico_addr;          /* IP of the current machine */
     char*           pico_pin_inet_sks;  /* path to file descriptor maintainer UNIXFD */
 };
