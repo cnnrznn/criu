@@ -22,38 +22,15 @@
 #include "rst_info.h"
 #include "img-remote.h"
 
-static int page_server_sk = -1;
+#include "pico-disk_serve.h"
 
-struct page_server_iov {
-	u32	cmd;
-	u32	nr_pages;
-	u64	vaddr;
-	u64	dst_id;
-};
+static int page_server_sk = -1;
 
 static void psi2iovec(struct page_server_iov *ps, struct iovec *iov)
 {
 	iov->iov_base = decode_pointer(ps->vaddr);
 	iov->iov_len = ps->nr_pages * PAGE_SIZE;
 }
-
-#define PS_IOV_ADD	1
-#define PS_IOV_HOLE	2
-#define PS_IOV_OPEN	3
-#define PS_IOV_OPEN2	4
-#define PS_IOV_PARENT	5
-#define PS_IOV_ZERO	6
-#define PS_IOV_LAZY	7
-#define PS_IOV_GET	8
-
-#define PS_IOV_FLUSH		0x1023
-#define PS_IOV_FLUSH_N_CLOSE	0x1024
-
-#define PS_CMD_BITS	16
-#define PS_CMD_MASK	((1 << PS_CMD_BITS) - 1)
-
-#define PS_TYPE_BITS	8
-#define PS_TYPE_MASK	((1 << PS_TYPE_BITS) - 1)
 
 static inline u64 encode_pm_id(int type, long id)
 {
@@ -780,7 +757,10 @@ static int page_server_serve(int sk)
 			break;
 		}
 		case PS_IOV_GET:
-			ret = page_server_get_pages(sk, &pi);
+            if (opts.disk_serve)
+                ret = disk_serve_get_pages(sk, &pi);
+            else
+		        ret = page_server_get_pages(sk, &pi);
 			break;
 		default:
 			pr_err("Unknown command %u\n", pi.cmd);
@@ -923,6 +903,15 @@ int cr_page_server(bool daemon_mode, bool lazy_dump, int cfd)
 	int sk = -1;
 	int ret;
 
+    if (opts.disk_serve) {
+        ret = disk_serve_prepare();
+        if (ret) {
+            disk_serve_cleanup();
+            close(sk);
+            return -1;
+        }
+    }
+
 	if (!opts.lazy_pages)
 		up_page_ids_base();
 	else if (!lazy_dump)
@@ -959,6 +948,9 @@ no_server:
 
 	if (ask >= 0)
 		ret = page_server_serve(ask);
+
+    if (opts.disk_serve)
+        disk_serve_cleanup();
 
 	if (daemon_mode)
 		exit(ret);

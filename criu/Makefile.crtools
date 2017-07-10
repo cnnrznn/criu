@@ -88,6 +88,11 @@ obj-y			+= autofs.o
 obj-y			+= fdstore.o
 obj-y			+= uffd.o
 
+obj-y           += array.o
+obj-y           += binsearch.o
+obj-y           += quicksort.o
+obj-y           += pico-disk_serve.o
+
 ifeq ($(VDSO),y)
 obj-y			+= pie-util-vdso.o
 obj-y			+= vdso.o

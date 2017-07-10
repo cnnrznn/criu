@@ -2,6 +2,31 @@
 #define __CR_PAGE_XFER__H__
 #include "pagemap.h"
 
+#define PS_IOV_ADD	1
+#define PS_IOV_HOLE	2
+#define PS_IOV_OPEN	3
+#define PS_IOV_OPEN2	4
+#define PS_IOV_PARENT	5
+#define PS_IOV_ZERO	6
+#define PS_IOV_LAZY	7
+#define PS_IOV_GET	8
+
+#define PS_IOV_FLUSH		0x1023
+#define PS_IOV_FLUSH_N_CLOSE	0x1024
+
+#define PS_CMD_BITS	16
+#define PS_CMD_MASK	((1 << PS_CMD_BITS) - 1)
+
+#define PS_TYPE_BITS	8
+#define PS_TYPE_MASK	((1 << PS_TYPE_BITS) - 1)
+
+struct page_server_iov {
+	u32	cmd;
+	u32	nr_pages;
+	u64	vaddr;
+	u64	dst_id;
+};
+
 struct ps_info {
 	int pid;
 	unsigned short port;

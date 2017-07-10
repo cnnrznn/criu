@@ -1,6 +1,11 @@
 #ifndef __CR_PAGE_READ_H__
 #define __CR_PAGE_READ_H__
 
+#include <stdbool.h>
+#include <sys/uio.h>
+#include <sys/types.h>
+
+#include "asm-generic/int.h"
 #include "common/list.h"
 #include "images/pagemap.pb-c.h"
 #include "page.h"
