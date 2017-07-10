@@ -36,8 +36,10 @@
 #define PSTREE_MAGIC		0x50273030 /* Kyiv */
 #define FDINFO_MAGIC		0x56213732 /* Dmitrov */
 #define PAGEMAP_MAGIC		0x56084025 /* Vladimir */
+#define META_PAGEMAP_MAGIC  PAGEMAP_MAGIC
 #define SHMEM_PAGEMAP_MAGIC	PAGEMAP_MAGIC
 #define PAGES_MAGIC		RAW_IMAGE_MAGIC
+#define META_PAGES_MAGIC    PAGES_MAGIC
 #define CORE_MAGIC		0x55053847 /* Kolomna */
 #define IDS_MAGIC		0x54432030 /* Konigsberg */
 #define VMAS_MAGIC		0x54123737 /* Tula */

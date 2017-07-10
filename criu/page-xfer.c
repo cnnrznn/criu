@@ -256,7 +256,7 @@ static void close_page_xfer(struct page_xfer *xfer)
 	close_image(xfer->pmi);
 }
 
-static int open_page_local_xfer(struct page_xfer *xfer, int fd_type, long id)
+static int open_page_local_xfer(struct page_xfer *xfer, int fd_type, long id, bool meta)
 {
 	u32 pages_id;
 
@@ -264,7 +264,7 @@ static int open_page_local_xfer(struct page_xfer *xfer, int fd_type, long id)
 	if (!xfer->pmi)
 		return -1;
 
-	xfer->pi = open_pages_image(O_DUMP, xfer->pmi, &pages_id);
+	xfer->pi = open_pages_image(O_DUMP, xfer->pmi, &pages_id, meta);
 	if (!xfer->pi) {
 		close_image(xfer->pmi);
 		return -1;
@@ -278,10 +278,11 @@ static int open_page_local_xfer(struct page_xfer *xfer, int fd_type, long id)
 	 *    to exist in parent (either pagemap or hole)
 	 */
 	xfer->parent = NULL;
-	if (fd_type == CR_FD_PAGEMAP || fd_type == CR_FD_SHMEM_PAGEMAP) {
+	if (fd_type == CR_FD_PAGEMAP || fd_type == CR_FD_SHMEM_PAGEMAP || fd_type == CR_FD_META_PAGEMAP) {
 		int ret;
 		int pfd;
-		int pr_flags = (fd_type == CR_FD_PAGEMAP) ? PR_TASK : PR_SHMEM;
+		int pr_flags = (fd_type == CR_FD_PAGEMAP ||
+                        fd_type == CR_FD_META_PAGEMAP) ? PR_TASK : PR_SHMEM;
 
 
 		if (opts.remote) {
@@ -329,12 +330,12 @@ out:
 	return 0;
 }
 
-int open_page_xfer(struct page_xfer *xfer, int fd_type, long id)
+int open_page_xfer(struct page_xfer *xfer, int fd_type, long id, bool meta)
 {
 	if (opts.use_page_server)
 		return open_page_server_xfer(xfer, fd_type, id);
 	else
-		return open_page_local_xfer(xfer, fd_type, id);
+		return open_page_local_xfer(xfer, fd_type, id, meta);
 }
 
 static int page_xfer_dump_hole(struct page_xfer *xfer,
@@ -557,7 +558,7 @@ static int page_server_open(int sk, struct page_server_iov *pi)
 
 	page_server_close();
 
-	if (open_page_local_xfer(&cxfer.loc_xfer, type, id))
+	if (open_page_local_xfer(&cxfer.loc_xfer, type, id, false))
 		return -1;
 
 	cxfer.dst_id = pi->dst_id;

@@ -294,7 +294,8 @@ static int __parasite_dump_pages_seized(struct pstree_item *item,
 		struct parasite_dump_pages_args *args,
 		struct vm_area_list *vma_area_list,
 		struct mem_dump_ctl *mdc,
-		struct parasite_ctl *ctl)
+		struct parasite_ctl *ctl,
+        bool meta)
 {
 	pmc_t pmc = PMC_INIT;
 	struct page_pipe *pp;
@@ -346,7 +347,10 @@ static int __parasite_dump_pages_seized(struct pstree_item *item,
 		 * right here. For pre-dumps the pp will be taken by the
 		 * caller and handled later.
 		 */
-		ret = open_page_xfer(&xfer, CR_FD_PAGEMAP, vpid(item));
+        if (meta)
+            ret = open_page_xfer(&xfer, CR_FD_META_PAGEMAP, vpid(item), meta);
+        else
+            ret = open_page_xfer(&xfer, CR_FD_PAGEMAP, vpid(item), meta);
 		if (ret < 0)
 			goto out_pp;
 	} else {
@@ -421,7 +425,7 @@ out_xfer:
 	if (!mdc->pre_dump)
 		xfer.close(&xfer);
 out_pp:
-	if (ret || !(mdc->pre_dump || mdc->lazy))
+	if (ret || !(mdc->pre_dump || mdc->lazy) || meta)
 		destroy_page_pipe(pp);
 	else
 		dmpi(item)->mem_pp = pp;
@@ -437,6 +441,7 @@ int parasite_dump_pages_seized(struct pstree_item *item,
 		struct parasite_ctl *ctl)
 {
 	int ret;
+    int ret_meta = 0;
 	struct parasite_dump_pages_args *pargs;
 
 	pargs = prep_dump_pages_args(ctl, vma_area_list, mdc->pre_dump);
@@ -461,8 +466,12 @@ int parasite_dump_pages_seized(struct pstree_item *item,
 		return -1;
 	}
 
-	ret = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl);
-	if (ret) {
+	ret = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, false);
+    if (opts.pico_dump) {
+        mdc->lazy = true;
+        ret_meta = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, true);
+    }
+	if (ret || ret_meta) {
 		pr_err("Can't dump page with parasite\n");
 		/* Parasite will unprotect VMAs after fail in fini() */
 		return ret;

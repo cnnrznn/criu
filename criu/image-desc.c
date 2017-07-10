@@ -25,6 +25,8 @@
 	}
 
 struct cr_fd_desc_tmpl imgset_template[CR_FD_MAX] = {
+    FD_ENTRY(META_PAGEMAP, "pagemap-meta-%ld"),
+    FD_ENTRY_F(META_PAGES, "pages-meta-%u", O_NOBUF),
 	FD_ENTRY(INVENTORY,	"inventory"),
 	FD_ENTRY(FDINFO,	"fdinfo-%d"),
 	FD_ENTRY(PAGEMAP,	"pagemap-%ld"),
