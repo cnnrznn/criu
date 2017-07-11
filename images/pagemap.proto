@@ -11,4 +11,7 @@ message pagemap_entry {
 	required uint32 nr_pages	= 2;
 	optional bool	in_parent	= 3;
 	optional uint32	flags		= 4 [(criu).flags = "pmap.flags" ];
+    optional uint64 version     = 5 [default = 0];
+    optional uint32 addr        = 6;
+    optional uint32 port        = 7;
 }

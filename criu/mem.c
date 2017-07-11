@@ -33,6 +33,10 @@
 
 #include "protobuf.h"
 #include "images/pagemap.pb-c.h"
+#include "pico-page_list.h"
+#include "pico-cache.h"
+
+#define MIN(a, b) a < b ? a : b;
 
 static int task_reset_dirty_track(int pid)
 {
@@ -172,6 +176,9 @@ static int generate_iovs(struct vma_area *vma, struct page_pipe *pp, u64 *map, u
 		if (vma_entry_can_be_lazy(vma->e))
 			ppb_flags |= PPB_LAZY;
 
+        if (at[pfn] & PME_SOFT_DIRTY)
+            ppb_flags |= PPB_DIRTY;
+
 		/*
 		 * If we're doing incremental dump (parent images
 		 * specified) and page is not soft-dirty -- we dump
@@ -284,7 +291,10 @@ static int xfer_pages(struct page_pipe *pp, struct page_xfer *xfer, bool lazy)
 	 *           pre-dump action (see pre_dump_one_task)
 	 */
 	timing_start(TIME_MEMWRITE);
-	ret = page_xfer_dump_pages(xfer, pp, 0, !lazy);
+    if (opts.pico_cache)
+        ret = pico_page_xfer_dump_pages(xfer, pp, 0, !lazy);
+    else
+        ret = page_xfer_dump_pages(xfer, pp, 0, !lazy);
 	timing_stop(TIME_MEMWRITE);
 
 	return ret;
@@ -307,6 +317,9 @@ static int __parasite_dump_pages_seized(struct pstree_item *item,
 
 	if (opts.check_only)
 		return 0;
+
+    xfer.pid = vpid(item);
+    xfer.vma_area_list = vma_area_list;
 
 	pr_info("\n");
 	pr_info("Dumping pages (type: %d pid: %d)\n", CR_FD_PAGES, item->pid->real);
@@ -414,6 +427,9 @@ again:
 	if (ret)
 		goto out_xfer;
 
+    if (opts.pico_cache)
+        pico_dump_end_cached_pagemaps(&xfer);
+
 	timing_stop(TIME_MEMDUMP);
 
 	/*
@@ -468,6 +484,7 @@ int parasite_dump_pages_seized(struct pstree_item *item,
 
 	ret = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, false);
     if (opts.pico_dump) {
+        pico_reset_page_read();
         mdc->lazy = true;
         ret_meta = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, true);
     }
@@ -866,6 +883,16 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 	unsigned int nr_lazy = 0;
 	unsigned long va;
 
+    struct page_read cpr;
+    struct pico_page_list *plhead = NULL;
+    if (opts.pico_cache) {
+        int dfd = open(opts.pico_cache, O_RDONLY);
+        ret = open_page_read_at(dfd, vpid(t), &cpr, PR_TASK);
+        if(ret <= 0)
+            return -1;
+        close(dfd);
+    }
+
 	if (opts.check_only) {
 		pr->close(pr);
 		return 0;
@@ -879,6 +906,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 	 */
 	while (1) {
 		unsigned long off, i, nr_pages;
+        struct iovec iov;
 
 		ret = pr->advance(pr);
 		if (ret <= 0)
@@ -887,11 +915,59 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 		va = (unsigned long)decode_pointer(pr->pe->vaddr);
 		nr_pages = pr->pe->nr_pages;
 
+        iov.iov_base = (void*)va;
+        iov.iov_len = nr_pages * PAGE_SIZE;
+
 		/*
 		 * This means that userfaultfd is used to load the pages
 		 * on demand.
 		 */
 		if (opts.lazy_pages && pagemap_lazy(pr->pe)) {
+            if (opts.pico_cache) {
+                /*
+                * for every cached pme in the region of this pme,
+                * if the version # matches, load it into memory
+                */
+                uint64_t end;
+                uint32_t nrp;
+                void *p;
+                cpr.seek_pagemap(&cpr, va);
+                while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
+                    end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
+                    (uint64_t)(iov.iov_base+iov.iov_len));
+
+                    while (cpr.cvaddr >= vma->e->end) {
+                        if (vma->list.next == vmas)
+                            goto err_addr;
+                        vma = list_entry(vma->list.next, struct vma_area, list);
+                    }
+                    off = (cpr.cvaddr - vma->e->start) / PAGE_SIZE;
+                    p = decode_pointer((off) * PAGE_SIZE + vma->premmaped_addr);
+
+                    nrp = (end - cpr.cvaddr) / PAGE_SIZE;
+
+                    if (cpr.pe->version == pr->pe->version
+                            && cpr.pe->flags & PE_PRESENT) {
+                        pr_debug("CONNOR: restoring %d pages at 0x%lx into 0x%lx from cache\n",
+                        nrp, cpr.cvaddr, (unsigned long)p);
+
+                        ret = cpr.read_pages(&cpr, cpr.cvaddr, nrp, p, 0);
+                        if (ret < 0)
+                            goto err_read;
+
+                        nr_restored += nrp;
+                    }
+                    else {
+                        struct pico_page_list *plent = malloc(sizeof(struct pico_page_list));
+                        plent->addr = (unsigned long)p;
+                        plent->size = end - cpr.cvaddr;
+                        plent->next = plhead;
+                        plhead = plent;
+
+                        cpr.skip_pages(&cpr, end - cpr.cvaddr);
+                    }
+                }
+            }
 			pr_debug("Lazy restore skips %ld pages at %lx\n", nr_pages, va);
 			pr->skip_pages(pr, nr_pages * PAGE_SIZE);
 			nr_lazy += nr_pages;
@@ -1003,7 +1079,21 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 		}
 	}
 
+while (plhead != NULL) {
+    //pr_debug("CONNOR: 0x%lx\n", plhead->addr);
+    int madr = madvise((void*)plhead->addr, plhead->size, MADV_DONTNEED);
+    if (madr < 0) {
+        pr_err("CONNOR: madvise(..., MADV_DONTNEED) failed\n");
+        exit(1);
+    }
+
+    plhead = plhead->next;
+}
+
 err_read:
+    if (opts.pico_cache)
+        cpr.close(&cpr);
+
 	if (pr->sync(pr))
 		return -1;
 

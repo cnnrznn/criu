@@ -92,6 +92,7 @@ obj-y           += array.o
 obj-y           += binsearch.o
 obj-y           += quicksort.o
 obj-y           += pico-disk_serve.o
+obj-y           += pico-cache.o
 
 ifeq ($(VDSO),y)
 obj-y			+= pie-util-vdso.o

@@ -96,6 +96,7 @@ struct page_pipe_buf {
 	unsigned int pages_in;	/* how many pages are there */
 	unsigned int nr_segs;	/* how many iov-s are busy */
 #define PPB_LAZY (1 << 0)
+#define PPB_DIRTY (1 << 1)
 	unsigned int flags;
 	struct iovec *iov;	/* vaddr:len map */
 	struct list_head l;	/* links into page_pipe->bufs */

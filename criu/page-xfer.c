@@ -93,7 +93,7 @@ static int write_pages_to_server(struct page_xfer *xfer,
 	return 0;
 }
 
-static int write_pagemap_to_server(struct page_xfer *xfer, struct iovec *iov, u32 flags)
+static int write_pagemap_to_server(struct page_xfer *xfer, struct iovec *iov, u32 flags, uint64_t version, unsigned addr, unsigned port)
 {
 	u32 cmd = 0;
 
@@ -209,7 +209,7 @@ static int check_pagehole_in_parent(struct page_read *p, struct iovec *iov)
 	}
 }
 
-static int write_pagemap_loc(struct page_xfer *xfer, struct iovec *iov, u32 flags)
+static int write_pagemap_loc(struct page_xfer *xfer, struct iovec *iov, u32 flags, uint64_t version, unsigned addr, unsigned port)
 {
 	int ret;
 	PagemapEntry pe = PAGEMAP_ENTRY__INIT;
@@ -218,6 +218,12 @@ static int write_pagemap_loc(struct page_xfer *xfer, struct iovec *iov, u32 flag
 	pe.nr_pages = iov->iov_len / PAGE_SIZE;
 	pe.has_flags = true;
 	pe.flags = flags;
+    pe.has_version = true;
+    pe.version = version;
+    pe.has_addr = true;
+    pe.addr = addr;
+    pe.has_port = true;
+    pe.port = port;
 
 	if (flags & PE_PRESENT) {
 		if (opts.auto_dedup && xfer->parent != NULL) {
@@ -346,7 +352,7 @@ static int page_xfer_dump_hole(struct page_xfer *xfer,
 	pr_debug("\th %p [%u]\n", hole->iov_base,
 			(unsigned int)(hole->iov_len / PAGE_SIZE));
 
-	if (xfer->write_pagemap(xfer, hole, flags))
+	if (xfer->write_pagemap(xfer, hole, flags, 0, 0, 0))
 		return -1;
 
 	return 0;
@@ -364,7 +370,7 @@ static int get_hole_flags(struct page_pipe *pp, int n)
 	return -1;
 }
 
-static int dump_holes(struct page_xfer *xfer, struct page_pipe *pp,
+int dump_holes(struct page_xfer *xfer, struct page_pipe *pp,
 		      unsigned int *cur_hole, void *limit, unsigned long off)
 {
 	int ret;
@@ -414,7 +420,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 
 			if (ppb->flags & PPB_LAZY) {
 				if (!dump_lazy) {
-					if (xfer->write_pagemap(xfer, &iov, PE_LAZY))
+					if (xfer->write_pagemap(xfer, &iov, PE_LAZY, 0, 0, 0))
 						return -1;
 					continue;
 				} else {
@@ -422,7 +428,7 @@ int page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 				}
 			}
 
-			if (xfer->write_pagemap(xfer, &iov, flags))
+			if (xfer->write_pagemap(xfer, &iov, flags, 0, 0, 0))
 				return -1;
 			if (xfer->write_pages(xfer, ppb->p[0], iov.iov_len))
 				return -1;
@@ -597,7 +603,7 @@ static int page_server_add(int sk, struct page_server_iov *pi, u32 flags)
 		return -1;
 
 	psi2iovec(pi, &iov);
-	if (lxfer->write_pagemap(lxfer, &iov, flags))
+	if (lxfer->write_pagemap(lxfer, &iov, flags, 0, 0, 0))
 		return -1;
 
 	if (!(flags & PE_PRESENT))
