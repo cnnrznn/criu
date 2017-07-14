@@ -20,6 +20,8 @@
 #include "images/pagemap.pb-c.h"
 #include "img-remote.h"
 
+#include "pico-restore.h"
+
 #ifndef SEEK_DATA
 #define SEEK_DATA	3
 #define SEEK_HOLE	4
@@ -468,6 +470,9 @@ static int maybe_read_page_remote(struct page_read *pr, unsigned long vaddr,
 				  int nr, void *buf, unsigned flags)
 {
 	int ret;
+
+    if (opts.pico_restore)
+        page_server_sk = pico_select_page_server(pr, vaddr);
 
 	/* We always do PR_ASAP mode here (FIXME?) */
 	ret = request_remote_pages(pr->pid, vaddr, nr);

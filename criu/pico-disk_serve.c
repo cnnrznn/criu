@@ -76,7 +76,7 @@ disk_serve_prepare(void)
         if (ret <= 0)
             break;
 
-        //printf("Found pid: %d\n", e->pid);
+        //pr_debug("CONNOR: Found pid: %u\n", e->pid);
 
         dpgs[dpgs_index] = malloc(sizeof(struct disk_pages));
         dpgs[dpgs_index]->pid = e->pid;
@@ -118,27 +118,27 @@ disk_serve_get_pages(int sk, struct page_server_iov *pi)
     other.pid = pi->dst_id;
     void *buf = malloc(pi->nr_pages * PAGE_SIZE);
 
-    dps = binsearch(&dpgs_arr, &other, 0, dpgs_arr.size-1);
-    pr_debug("CONNOR: binsearch success!\n");
+    dps = binsearch(&dpgs_arr, &other, 0, dpgs_index-1);
+    //pr_debug("CONNOR: binsearch success!\n");
 
     dps->pr.reset(&dps->pr);
     dps->pr.seek_pagemap(&dps->pr, pi->vaddr);
 
     dps->pr.read_pages(&dps->pr, pi->vaddr, pi->nr_pages, buf, 0);
-    pr_debug("CONNOR: read %d pages starting at %lx into buffer\n", pi->nr_pages, (long unsigned)pi->vaddr);
+    //pr_debug("CONNOR: read %d pages starting at %lx into buffer\n", pi->nr_pages, (long unsigned)pi->vaddr);
 
     ret = send_psi(sk, PS_IOV_ADD, pi->nr_pages, dps->pr.pe->vaddr, pi->dst_id);
     if (ret)
         goto out;
-    pr_debug("CONNOR: send_psi success!\n");
+    //pr_debug("CONNOR: send_psi success!\n");
 
     if (write(sk, buf, pi->nr_pages * PAGE_SIZE) != pi->nr_pages*PAGE_SIZE) {
         ret = 1;
         goto out;
     }
-    pr_debug("CONNOR: wrote %d pages to sk\n", pi->nr_pages);
-    pr_debug("CONNOR: vaddr: %lx\n", (long unsigned)pi->vaddr);
-    pr_debug("CONNOR: pid: %lu\n", pi->dst_id);
+    //pr_debug("CONNOR: wrote %d pages to sk\n", pi->nr_pages);
+    //pr_debug("CONNOR: vaddr: %lx\n", (long unsigned)pi->vaddr);
+    //pr_debug("CONNOR: pid: %lu\n", pi->dst_id);
     pr_debug("\n");
 
 out:

@@ -413,6 +413,9 @@ int dump_pstree(struct pstree_item *root_item)
 
 		e.ppid		= item->parent ? vpid(item->parent) : 0;
 
+        e.pid = vpid(item);
+        e.has_pid = true;
+
 		if (plant_ns_xid(&e.ns_pid,  &e.n_ns_pid,  level, item->pid)  < 0 ||
 		    plant_ns_xid(&e.ns_pgid, &e.n_ns_pgid, level, item->pgid) < 0 ||
 		    plant_ns_xid(&e.ns_sid,  &e.n_ns_sid,  level, item->sid)  < 0)

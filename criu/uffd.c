@@ -631,7 +631,7 @@ static int ud_open(int client, struct lazy_pages_info **_lpi)
 	}
 	pr_debug("Received PID: %d, uffd: %d\n", lpi->pid, lpi->lpfd.fd);
 
-	if (opts.use_page_server)
+	if (opts.use_page_server || opts.pico_restore)
 		pr_flags |= PR_REMOTE;
 	ret = open_page_read(lpi->pid, &lpi->pr, pr_flags);
 	if (ret <= 0) {

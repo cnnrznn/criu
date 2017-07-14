@@ -11,7 +11,7 @@
 
 #define MIN(a, b) a < b ? a : b;
 
-static struct page_read pr;
+static struct page_read pr = { 0 };
 static struct iovec ciov;
 static int page_read_set = 0;
 
@@ -192,8 +192,10 @@ pico_reset_page_read()
      * reset the page reader for the cache
      */
 
-     pr.reset(&pr);
-     pr.advance(&pr);
+    if (opts.pico_cache) {
+         pr.reset(&pr);
+         pr.advance(&pr);
+    }
 }
 
 int

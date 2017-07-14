@@ -96,4 +96,6 @@ extern int page_server_start_read(void *buf, int nr_pages,
 extern int dump_holes(struct page_xfer *xfer, struct page_pipe *pp,
 		      unsigned int *cur_hole, void *limit, unsigned long off);
 
+extern int page_server_sk;
+
 #endif /* __CR_PAGE_XFER__H__ */

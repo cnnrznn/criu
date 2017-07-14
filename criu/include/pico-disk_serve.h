@@ -5,11 +5,6 @@
 
 #define DISK_SERVE_PSBUF_SIZE 1024  /* number of processes to create buffers for */
 
-struct page_server {
-    uint32_t addr;
-    int sk;
-};
-
 struct disk_pages {
     int pid;
     struct page_read pr;

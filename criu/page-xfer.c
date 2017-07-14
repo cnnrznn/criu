@@ -24,7 +24,7 @@
 
 #include "pico-disk_serve.h"
 
-static int page_server_sk = -1;
+int page_server_sk = -1;
 
 static void psi2iovec(struct page_server_iov *ps, struct iovec *iov)
 {
@@ -685,7 +685,7 @@ static int page_server_serve(int sk)
 {
 	int ret = -1;
 	bool flushed = false;
-	bool receiving_pages = !opts.lazy_pages;
+	bool receiving_pages = !opts.lazy_pages && !opts.disk_serve;
 
 	if (receiving_pages) {
 		/*
