@@ -275,5 +275,9 @@ pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
 
     } while (pr.advance(&pr));
 
+    // if multiple processes, will need to reopen a different pagemap cache
+    page_read_set = 0;
+    pr.close(&pr);
+
     return 0;
 }
