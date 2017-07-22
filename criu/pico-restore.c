@@ -137,8 +137,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     list_for_each_entry(vma, &vmas->h, list) {
         if (vma->e->start <= addr && vma->e->end > addr) {
             if (vma->e->flags & MAP_PIN) {
-                pr_debug("CONNOR: vma pinned\n");
-
                 // call migration library
                 struct in_addr inaddr;
                 inaddr.s_addr = vma->e->pico_addr;
@@ -151,8 +149,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
             }
         }
     }
-
-    pr_debug("CONNOR: vma not pinned\n");
 
     if (page_servers == NULL) {
         page_servers_size = 16;
@@ -172,15 +168,8 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
         page_servers_ct++;
     }
 
-    pr_debug("CONNOR: binsearch for page server at %d\n", pr->pe->addr);
-
     page_server tmp = { .sk = 0, .addr = pr->pe->addr };
     page_server *server = binsearch(&page_servers_arr, &tmp, 0, page_servers_ct-1);
-
-    if (server)
-        pr_debug("CONNOR: found page server for addr %d\n", pr->pe->addr);
-    else
-        pr_debug("CONNOR: no server yet for addr %d\n", pr->pe->addr);
 
     if (server == NULL) {   // not found; connect
         if (page_servers_ct == page_servers_size) { // realloc
@@ -211,7 +200,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 	};
 
 	/* We cannot use send_psi here because we have to use MSG_DONTWAIT */
-    pr_debug("CONNOR: sending PSI to server\n");
 	if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
 		pr_perror("Can't write PSI to server");
 		return -1;
