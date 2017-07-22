@@ -6,6 +6,7 @@
 
 #include "array.h"
 #include "binsearch.h"
+#include "criu-log.h"
 #include "cr_options.h"
 #include "image.h"
 #include "images/pstree.pb-c.h"
@@ -18,7 +19,8 @@ static struct disk_pages **dpgs;
 static int dpgs_index = 0;
 static array dpgs_arr;
 
-static inline int send_psi(int sk, u32 cmd, u32 nr_pages, u64 vaddr, u64 dst_id)
+static inline int
+send_psi(int sk, u32 cmd, u32 nr_pages, u64 vaddr, u64 dst_id)
 {
 	struct page_server_iov pi = {
 		.cmd		= cmd,
@@ -119,31 +121,39 @@ disk_serve_get_pages(int sk, struct page_server_iov *pi)
     void *buf = malloc(pi->nr_pages * PAGE_SIZE);
 
     dps = binsearch(&dpgs_arr, &other, 0, dpgs_index-1);
-    //pr_debug("CONNOR: binsearch success!\n");
 
     dps->pr.reset(&dps->pr);
     dps->pr.seek_pagemap(&dps->pr, pi->vaddr);
+    dps->pr.skip_pages(&dps->pr, pi->vaddr - dps->pr.pe->vaddr);
+
+    //pr_debug("CONNOR: seeked to pagemap 0x%lx\n", dps->pr.cvaddr);
 
     dps->pr.read_pages(&dps->pr, pi->vaddr, pi->nr_pages, buf, 0);
     //pr_debug("CONNOR: read %d pages starting at %lx into buffer\n", pi->nr_pages, (long unsigned)pi->vaddr);
 
-    ret = send_psi(sk, PS_IOV_ADD, pi->nr_pages, dps->pr.pe->vaddr, pi->dst_id);
-    if (ret)
-        goto out;
-    //pr_debug("CONNOR: send_psi success!\n");
-
+    pr_debug("CONNOR: time before page write\n");
     if (write(sk, buf, pi->nr_pages * PAGE_SIZE) != pi->nr_pages*PAGE_SIZE) {
-        ret = 1;
+        ret = -1;
+        pr_err("CONNOR: failed to serve disk pages\n");
         goto out;
     }
-    //pr_debug("CONNOR: wrote %d pages to sk\n", pi->nr_pages);
-    //pr_debug("CONNOR: vaddr: %lx\n", (long unsigned)pi->vaddr);
-    //pr_debug("CONNOR: pid: %lu\n", pi->dst_id);
+    pr_debug("CONNOR: time after page write\n");
+
+    // flush socket buffer
+    tcp_nodelay(sk, true);
+
+    /*pr_debug("CONNOR: disk-serve raw page data (%lu):\n", pi->nr_pages * PAGE_SIZE);
+    pr_debug("====================\n");
+    int logfd = log_get_fd();
+    int foo = write(logfd, buf, pi->nr_pages * PAGE_SIZE);
+    if (foo < pi->nr_pages * PAGE_SIZE)
+        pr_debug("CONNOR: foo\n");
+    pr_debug("\n====================\n");*/
+
     pr_debug("\n");
 
 out:
     free(buf);
-    if (ret)
-        return -1;
-    return 0;
+
+    return ret;
 }

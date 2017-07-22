@@ -9,6 +9,9 @@ typedef struct page_server_t {
 } page_server;
 
 extern int
-pico_select_page_server(struct page_read *, long unsigned);
+pico_get_remote_pages(struct page_read *, long unsigned, int, void *);
+
+extern int
+pico_disconn_page_servers(void);
 
 #endif /* _PJ_RESTORE_H */

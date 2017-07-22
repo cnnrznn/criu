@@ -10,6 +10,7 @@
 #include <ctype.h>
 #include <linux/fs.h>
 #include <sys/sysmacros.h>
+#include <linux/mman.h>
 
 #include "types.h"
 #include "common/list.h"
@@ -104,7 +105,7 @@ bool is_vma_range_fmt(char *line)
 	return __is_vma_range_fmt(line);
 }
 
-static void __parse_vmflags(char *buf, u32 *flags, u64 *madv, int *io_pf)
+static void __parse_vmflags(char *buf, u32 *flags, u64 *madv, int *io_pf, struct vma_area *vma_area)
 {
 	char *tok;
 
@@ -127,6 +128,11 @@ static void __parse_vmflags(char *buf, u32 *flags, u64 *madv, int *io_pf)
 			*flags |= MAP_NORESERVE;
 		else if (_vmflag_match(tok, "ht"))
 			*flags |= MAP_HUGETLB;
+        else if (_vmflag_match(tok, "pn")) {
+            vma_area->e->flags |= MAP_PIN;
+            vma_area->e->pico_addr = opts.pico_addr.s_addr;
+            vma_area->e->has_pico_addr = true;
+        }
 
 		/* madvise() block */
 		if (_vmflag_match(tok, "sr"))
@@ -158,14 +164,14 @@ static void __parse_vmflags(char *buf, u32 *flags, u64 *madv, int *io_pf)
 
 void parse_vmflags(char *buf, u32 *flags, u64 *madv, int *io_pf)
 {
-	__parse_vmflags(buf, flags, madv, io_pf);
+	__parse_vmflags(buf, flags, madv, io_pf, NULL);
 }
 
 static void parse_vma_vmflags(char *buf, struct vma_area *vma_area)
 {
 	int io_pf = 0;
 
-	__parse_vmflags(buf, &vma_area->e->flags, &vma_area->e->madv, &io_pf);
+	__parse_vmflags(buf, &vma_area->e->flags, &vma_area->e->madv, &io_pf, vma_area);
 
 	/*
 	 * vmsplice doesn't work for VM_IO and VM_PFNMAP mappings, the

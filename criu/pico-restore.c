@@ -6,7 +6,9 @@
 
 #include "array.h"
 #include "binsearch.h"
+#include "criu-log.h"
 #include "migrate.h"
+#include "page-xfer.h"
 #include "pstree.h"
 #include "quicksort.h"
 #include "rst_info.h"
@@ -17,6 +19,17 @@ static page_server *page_servers = NULL;
 static int page_servers_size = 0;
 static int page_servers_ct = 0;
 static array page_servers_arr;
+
+static inline int
+recv_psi(int sk, struct page_server_iov *pi)
+{
+    if (recv(sk, pi, sizeof(*pi), 0) != sizeof(*pi)) {
+        pr_perror("Can't recv PSI from server");
+        return -1;
+    }
+
+    return 0;
+}
 
 static int
 pico_conn_server(int addr, int port)
@@ -47,13 +60,49 @@ pico_conn_server(int addr, int port)
         return -1;
     }
 
+    // output is buffered
     tcp_cork(sk, true);
 
     return sk;
 }
 
+/*
+int
+pico_disconn_page_servers(void)
+{
+	struct page_server_iov pi = { };
+	int32_t status = -1;
+	int ret = -1;
+
+	pr_info("PicoJump disconnect from the page servers\n");
+
+	pi.cmd = PS_IOV_FLUSH_N_CLOSE;
+
+    page_server *ps = page_servers;
+    int i = 0;
+    while (i < page_servers_ct) {
+        if (write(ps->sk, &pi, sizeof(pi)) != sizeof(pi)) {
+            pr_perror("Can't write the fini command to server");
+            goto out;
+        }
+
+        if (read(ps->sk, &status, sizeof(status)) != sizeof(status)) {
+            pr_perror("The page server doesn't answer");
+            goto out;
+        }
+        i++;
+        ps++;
+    }
+
+	ret = 0;
+out:
+	return ret ? : status;
+}
+*/
+
 static char
-comp_page_servers(void *a, void *b) {
+comp_page_servers(void *a, void *b)
+{
     page_server *x = a;
     page_server *y = b;
 
@@ -66,7 +115,7 @@ comp_page_servers(void *a, void *b) {
 }
 
 int
-pico_select_page_server(struct page_read *pr, long unsigned addr)
+pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *buf)
 {
     /*
     * 0. if pinned, checkpoint and restore on page owner's machine
@@ -88,6 +137,8 @@ pico_select_page_server(struct page_read *pr, long unsigned addr)
     list_for_each_entry(vma, &vmas->h, list) {
         if (vma->e->start <= addr && vma->e->end > addr) {
             if (vma->e->flags & MAP_PIN) {
+                pr_debug("CONNOR: vma pinned\n");
+
                 // call migration library
                 struct in_addr inaddr;
                 inaddr.s_addr = vma->e->pico_addr;
@@ -101,16 +152,16 @@ pico_select_page_server(struct page_read *pr, long unsigned addr)
         }
     }
 
+    pr_debug("CONNOR: vma not pinned\n");
+
     if (page_servers == NULL) {
         page_servers_size = 16;
         page_servers = malloc(16 * sizeof(page_server));
         array_init(&page_servers_arr, 16, comp_page_servers);
     }
 
-    //pr_debug("CONNOR: trying to find page with page read\n");
     pr->reset(pr);
     ret = pr->seek_pagemap(pr, addr);
-
     if (!ret)
         return -1;
 
@@ -121,13 +172,20 @@ pico_select_page_server(struct page_read *pr, long unsigned addr)
         page_servers_ct++;
     }
 
+    pr_debug("CONNOR: binsearch for page server at %d\n", pr->pe->addr);
+
     page_server tmp = { .sk = 0, .addr = pr->pe->addr };
     page_server *server = binsearch(&page_servers_arr, &tmp, 0, page_servers_ct-1);
+
+    if (server)
+        pr_debug("CONNOR: found page server for addr %d\n", pr->pe->addr);
+    else
+        pr_debug("CONNOR: no server yet for addr %d\n", pr->pe->addr);
 
     if (server == NULL) {   // not found; connect
         if (page_servers_ct == page_servers_size) { // realloc
             page_servers_size *= 2;
-            page_servers = realloc(page_servers, 
+            page_servers = realloc(page_servers,
             page_servers_size * sizeof(page_server));
             page_servers_arr.size = page_servers_size;
             page_servers_arr.elems = realloc(page_servers_arr.elems,
@@ -143,8 +201,42 @@ pico_select_page_server(struct page_read *pr, long unsigned addr)
         quicksort(0, page_servers_ct-1, &page_servers_arr);
     }
 
-    return server->sk;
+    // request pages from page server
+
+	struct page_server_iov pi = {
+		.cmd		= PS_IOV_GET,
+		.nr_pages	= nr,
+		.vaddr		= addr,
+		.dst_id		= pr->pid,
+	};
+
+	/* We cannot use send_psi here because we have to use MSG_DONTWAIT */
+    pr_debug("CONNOR: sending PSI to server\n");
+	if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
+		pr_perror("Can't write PSI to server");
+		return -1;
+	}
+
+    // flush socket buffer
+	tcp_nodelay(server->sk, true);
+
+    // recv page data
+    int total_recv = 0;
+    pr_debug("CONNOR: time before page read\n");
+    while (total_recv < nr * PAGE_SIZE) {
+        int tmp = read(server->sk, buf + total_recv, (nr * PAGE_SIZE) - total_recv);
+        total_recv += tmp;
+    }
+    pr_debug("CONNOR: time after page read\n");
+
+    /*pr_debug("CONNOR: pico-restore raw page data (%lu):\n", nr * PAGE_SIZE);
+    pr_debug("====================\n");
+    int logfd = log_get_fd();
+    int foo = write(logfd, buf, nr * PAGE_SIZE);
+    if (foo < nr * PAGE_SIZE)
+        pr_debug("CONNOR: foo\n");
+    pr_debug("\n====================\n\n");*/
 
 jail:
-    return 1;
+    return 0;
 }

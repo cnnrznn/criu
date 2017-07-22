@@ -2010,6 +2010,11 @@ static void finalize_restore_detach(int status)
 	struct pstree_item *item;
 
 	for_each_pstree_item(item) {
+        if (opts.track_mem) {
+            if (do_task_reset_dirty_track(item->pid->real))
+                pr_perror("CONNOR: unable to reset dirty track on %d\n", item->pid->real);
+        }
+
 		pid_t pid;
 		int i;
 
@@ -2281,7 +2286,7 @@ skip_ns_bouncing:
 	if (write_restored_pid())
 		goto out_kill;
 
-	if (!opts.check_only)
+	if (!opts.check_only && !opts.pico_pin_inet_sks)
 		/* Unlock network before disabling repair mode on sockets */
 		network_unlock();
 

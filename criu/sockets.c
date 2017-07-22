@@ -28,6 +28,8 @@
 #include "pstree.h"
 #include "util.h"
 #include "fdstore.h"
+#include "cr_options.h"
+#include "pico-sk_inet.h"
 
 #ifndef SOCK_DIAG_BY_FAMILY
 #define SOCK_DIAG_BY_FAMILY 20
@@ -570,7 +572,10 @@ int dump_socket(struct fd_parms *p, int lfd, struct cr_img *img)
 		ops = &unix_dump_ops;
 		break;
 	case AF_INET:
-		ops = &inet_dump_ops;
+        if (opts.pico_pin_inet_sks)
+            ops = &pico_inet_dump_ops;
+        else
+            ops = &inet_dump_ops;
 		break;
 	case AF_INET6:
 		ops = &inet6_dump_ops;

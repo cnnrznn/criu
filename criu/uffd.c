@@ -652,6 +652,17 @@ static int ud_open(int client, struct lazy_pages_info **_lpi)
 
 	lp_debug(lpi, "Found %ld pages to be handled by UFFD\n", lpi->total_pages);
 
+    if (opts.pico_restore) {
+        if (prepare_files()) {
+            goto out;
+        }
+
+        struct pstree_item *item = pstree_item_by_virt(lpi->pid);
+        if (prepare_mm_pid(item)) {
+            goto out;
+        }
+    }
+
 	list_add_tail(&lpi->l, &lpis);
 	*_lpi = lpi;
 
@@ -1059,7 +1070,7 @@ static void lazy_pages_summary(struct lazy_pages_info *lpi)
 #endif
 }
 
-#define POLL_TIMEOUT 1000
+#define POLL_TIMEOUT -1;
 
 static int handle_requests(int epollfd, struct epoll_event *events, int nr_fds)
 {
@@ -1073,6 +1084,10 @@ static int handle_requests(int epollfd, struct epoll_event *events, int nr_fds)
 		ret = epoll_run_rfds(epollfd, events, nr_fds, poll_timeout);
 		if (ret < 0)
 			goto out;
+
+        if (opts.pico_restore)
+            continue;
+
 		if (ret > 0) {
 			if (complete_forks(epollfd, &events, &nr_fds))
 				return -1;

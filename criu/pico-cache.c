@@ -42,9 +42,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
         if (ret <= 0)
             return -1;
         close(dfd);
-        pr.advance(&pr);
-        ciov.iov_base = (void*)pr.pe->vaddr;
-        ciov.iov_len = pr.pe->nr_pages * PAGE_SIZE;
+        pico_reset_page_read();
     }
     if (opts.pico_cache) {
         vma = list_entry(xfer->vma_area_list->h.next, typeof(*vma), list);
@@ -69,86 +67,59 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
             BUG_ON(iov.iov_base < (void *)off);
             iov.iov_base -= off;
             pr_debug("\tp %p [%u]\n", iov.iov_base,
-            (unsigned int)(iov.iov_len / PAGE_SIZE));
+                    (unsigned int)(iov.iov_len / PAGE_SIZE));
 
-            /*
-            * 1. dump all complete cached pmes/pages (unless lazy) until next present region
-            * 2. dump partial cached region before present region (if exists)
-            * 3. alternate dumping new regions and overlapping regions
-            When they overlap, use appropriate version# and addr. Increment page_read appropriately
-            When new, verion#=0, addr and port are current interface
-            */
-            void *end;
+            if (opts.pico_cache) {
+                /*
+                * 1. dump all complete cached pmes/pages (unless lazy) until next present region
+                * 2. dump partial cached region before present region (if exists)
+                * 3. alternate dumping new regions and overlapping regions
+                When they overlap, use appropriate version# and addr. Increment page_read appropriately
+                When new, verion#=0, addr and port are current interface
+                */
+                void *end;
 
-            while ((void*)pr.cvaddr < iov.iov_base) {
-                // find the bounds of the unloaded pme
-                end = MIN(ciov.iov_base + ciov.iov_len, iov.iov_base);
-                tmpiov.iov_base = (void*)pr.cvaddr;
-                tmpiov.iov_len = end - tmpiov.iov_base;
+                //pr_debug("CONNOR: dumping prior pagemaps\n");
 
-                // find the first vma <= bounds
-                while (vmaiov.iov_base < tmpiov.iov_base) {
-                    if ((void*)vma->e->end <= tmpiov.iov_base) {
-                        vma = list_entry(vma->list.next, typeof(*vma), list);
-                        vmaiov.iov_base = (void*)vma->e->start;
-                    }
-                    else {
-                        vmaiov.iov_base = tmpiov.iov_base;
-                    }
-                }
+                while ((void*)pr.cvaddr < iov.iov_base) {
+                    // find the bounds of the unloaded pme
+                    end = MIN(ciov.iov_base + ciov.iov_len, iov.iov_base);
+                    tmpiov.iov_base = (void*)pr.cvaddr;
+                    tmpiov.iov_len = end - tmpiov.iov_base;
 
-                // dump every section of pme that overlaps with vmas
-                while (vmaiov.iov_base < tmpiov.iov_base + tmpiov.iov_len) {
-                    void *vmaend = MIN((void*)vma->e->end, tmpiov.iov_base + tmpiov.iov_len);
-                    vmaiov.iov_len = vmaend - vmaiov.iov_base;
-
-                    // dump pagemap entry
-                    xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version,
-                    pr.pe->addr, pr.pe->port);
-
-                    if ((void*)vma->e->end > tmpiov.iov_base + tmpiov.iov_len) {
-                        vmaiov.iov_base = tmpiov.iov_base + tmpiov.iov_len;
-                    }
-                    else {
-                        vma = list_entry(vma->list.next, typeof(*vma), list);
-                        vmaiov.iov_base = (void*)vma->e->start;
-                    }
-                }
-
-                if (ciov.iov_base + ciov.iov_len <= iov.iov_base) {
-                    pr.advance(&pr);
-                    ciov.iov_base = (void*)pr.pe->vaddr;
-                    ciov.iov_len = pr.pe->nr_pages * PAGE_SIZE;
-                }
-                else {
-                    pr.seek_pagemap(&pr, (unsigned long)iov.iov_base);
-                }
-            }
-
-            unsigned long size_dumped = 0;
-            tmpiov.iov_base = iov.iov_base;
-            while (size_dumped < iov.iov_len) {
-                if (tmpiov.iov_base < (void*)pr.cvaddr) {   // only in new
-                    end = MIN(iov.iov_base + iov.iov_len, (void*)pr.cvaddr);
-                    version = 0;
-                    addr = maddr;
-                    port = mport;
-                }
-                else {                                      // overlap
-                    end = MIN(iov.iov_base + iov.iov_len, ciov.iov_base + ciov.iov_len)
-                    version = pr.pe->version;
-                    if (ppb->flags & PPB_DIRTY) {
-                        version++;
-                        addr = maddr;
-                        port = mport;
-                    }
-                    else {
-                        addr = pr.pe->addr;
-                        port = pr.pe->port;
+                    // find the first vma <= bounds
+                    while (vmaiov.iov_base < tmpiov.iov_base) {
+                        if ((void*)vma->e->end <= tmpiov.iov_base) {
+                            vma = list_entry(vma->list.next, typeof(*vma), list);
+                            vmaiov.iov_base = (void*)vma->e->start;
+                        }
+                        else {
+                            vmaiov.iov_base = tmpiov.iov_base;
+                        }
                     }
 
-                    if (ciov.iov_base + ciov.iov_len > iov.iov_base + iov.iov_len) {
-                        pr.seek_pagemap(&pr, (unsigned long)(iov.iov_base + iov.iov_len));
+                    // dump every section of pme that overlaps with vmas
+                    while (vmaiov.iov_base < tmpiov.iov_base + tmpiov.iov_len) {
+                        void *vmaend = MIN((void*)vma->e->end, tmpiov.iov_base + tmpiov.iov_len);
+                        vmaiov.iov_len = vmaend - vmaiov.iov_base;
+
+                        // dump pagemap entry
+                        //pr_debug("CONNOR: writing pagemap 0x%lx - 0x%lx\n", (long unsigned)vmaiov.iov_base, (long unsigned)vmaiov.iov_base + vmaiov.iov_len);
+                        xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version,
+                        pr.pe->addr, pr.pe->port);
+
+                        if ((void*)vma->e->end > tmpiov.iov_base + tmpiov.iov_len) {
+                            vmaiov.iov_base = tmpiov.iov_base + tmpiov.iov_len;
+                        }
+                        else {
+                            vma = list_entry(vma->list.next, typeof(*vma), list);
+                            vmaiov.iov_base = (void*)vma->e->start;
+                        }
+                    }
+
+                    if (ciov.iov_base + ciov.iov_len > iov.iov_base) {
+                        pr.skip_pages(&pr, (long unsigned)iov.iov_base - pr.cvaddr);
+                        //pr_debug("CONNOR: pr.cvaddr = 0x%lx\n", pr.cvaddr);
                     }
                     else {
                         pr.advance(&pr);
@@ -157,25 +128,81 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                     }
                 }
 
-                tmpiov.iov_len = end - tmpiov.iov_base;
+                //pr_debug("CONNOR: dumping current and overlapping pagemaps\n");
 
-                if (ppb->flags & PPB_LAZY && !dump_lazy) {
-                    flags = PE_LAZY;
-                    if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port))
-                        return -1;
+                unsigned long size_dumped = 0;
+                tmpiov.iov_base = iov.iov_base;
+                while (size_dumped < iov.iov_len) {
+                    if (tmpiov.iov_base < (void*)pr.cvaddr) {   // only in new
+                        end = MIN(iov.iov_base + iov.iov_len, (void*)pr.cvaddr);
+                        version = 0;
+                        addr = maddr;
+                        port = mport;
+                    }
+                    else {                                      // overlap
+                        end = MIN(iov.iov_base + iov.iov_len, ciov.iov_base + ciov.iov_len)
+                        version = pr.pe->version;
+                        if (ppb->flags & PPB_DIRTY) {
+                            version++;
+                            addr = maddr;
+                            port = mport;
+                        }
+                        else {
+                            addr = pr.pe->addr;
+                            port = pr.pe->port;
+                        }
+
+                        if (ciov.iov_base + ciov.iov_len > iov.iov_base + iov.iov_len) {
+                            pr.skip_pages(&pr, (long unsigned)(iov.iov_base) + iov.iov_len - pr.cvaddr);
+                            //pr_debug("CONNOR: pr.cvaddr = 0x%lx\n", pr.cvaddr);
+                        }
+                        else {
+                            pr.advance(&pr);
+                            ciov.iov_base = (void*)pr.pe->vaddr;
+                            ciov.iov_len = pr.pe->nr_pages * PAGE_SIZE;
+                        }
+                    }
+
+                    tmpiov.iov_len = end - tmpiov.iov_base;
+
+                    if (ppb->flags & PPB_LAZY && !dump_lazy) {
+                        flags = PE_LAZY;
+                        //pr_debug("CONNOR: writing pagemap 0x%lx - 0x%lx\n", (long unsigned)tmpiov.iov_base, (long unsigned)tmpiov.iov_base + tmpiov.iov_len);
+                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port)) {
+                            return -1;
+                        }
+                    }
+                    else if (ppb->flags & PPB_LAZY && dump_lazy) {
+                        flags |= PE_LAZY;
+                    }
+                    if (flags != PE_LAZY) {
+                        //pr_debug("CONNOR: writing pagemap 0x%lx - 0x%lx\n", (long unsigned)tmpiov.iov_base, (long unsigned)tmpiov.iov_base + tmpiov.iov_len);
+                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port)) {
+                            return -1;
+                        }
+                        if (xfer->write_pages(xfer, ppb->p[0], tmpiov.iov_len))
+                            return -1;
+                    }
+
+                    size_dumped += tmpiov.iov_len;
+                    tmpiov.iov_base = tmpiov.iov_base + tmpiov.iov_len;
                 }
-                else if (ppb->flags & PPB_LAZY && dump_lazy) {
-                    flags |= PE_LAZY;
-                }
-                if (flags != PE_LAZY) {
-                    if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port))
-                        return -1;
-                    if (xfer->write_pages(xfer, ppb->p[0], tmpiov.iov_len))
-                        return -1;
+            }
+            else {
+                if (ppb->flags & PPB_LAZY) {
+                    if (!dump_lazy) {
+                        if (xfer->write_pagemap(xfer, &iov, PE_LAZY, version, addr, port))
+                            return -1;
+                        continue;
+                    } else {
+                        flags |= PE_LAZY;
+                    }
                 }
 
-                size_dumped += tmpiov.iov_len;
-                tmpiov.iov_base = tmpiov.iov_base + tmpiov.iov_len;
+                if (xfer->write_pagemap(xfer, &iov, flags, version, addr, port))
+                    return -1;
+                if (xfer->write_pages(xfer, ppb->p[0], iov.iov_len))
+                    return -1;
             }
         }
     }
@@ -193,8 +220,10 @@ pico_reset_page_read()
      */
 
     if (opts.pico_cache) {
-         pr.reset(&pr);
-         pr.advance(&pr);
+        pr.reset(&pr);
+        pr.advance(&pr);
+        ciov.iov_base = (void*)pr.pe->vaddr;
+        ciov.iov_len = pr.pe->nr_pages * PAGE_SIZE;
     }
 }
 

@@ -27,6 +27,8 @@
 #include "util.h"
 #include "namespaces.h"
 
+#include "pico-sk_inet.h"
+
 #define PB_ALEN_INET	1
 #define PB_ALEN_INET6	4
 
@@ -71,7 +73,7 @@ out_link:
 	return e;
 }
 
-static void show_one_inet(const char *act, const struct inet_sk_desc *sk)
+void show_one_inet(const char *act, const struct inet_sk_desc *sk)
 {
 	char src_addr[INET_ADDR_LEN] = "<unknown>";
 
@@ -86,7 +88,7 @@ static void show_one_inet(const char *act, const struct inet_sk_desc *sk)
 		sk->state, src_addr);
 }
 
-static void show_one_inet_img(const char *act, const InetSkEntry *e)
+void show_one_inet_img(const char *act, const InetSkEntry *e)
 {
 	char src_addr[INET_ADDR_LEN] = "<unknown>";
 
@@ -201,7 +203,7 @@ static int dump_sockaddr(union libsoccr_addr *sa, u32 *pb_port, u32 *pb_addr)
 	return -1;
 }
 
-static struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto)
+struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto)
 {
 	struct inet_sk_desc *sk;
 	union libsoccr_addr address;
@@ -263,7 +265,8 @@ static struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int 
 			goto err;
 		}
 
-		if (info.tcpi_state != TCP_CLOSE) {
+		if (info.tcpi_state != TCP_CLOSE &&
+                !opts.pico_pin_inet_sks) {
 			pr_err("Socket state %d obtained but expected %d\n",
 			       info.tcpi_state, TCP_CLOSE);
 			goto err;
@@ -282,7 +285,7 @@ err:
 	return NULL;
 }
 
-static int dump_ip_opts(int sk, IpOptsEntry *ioe)
+int dump_ip_opts(int sk, IpOptsEntry *ioe)
 {
 	int ret = 0;
 
@@ -298,7 +301,7 @@ static int dump_ip_opts(int sk, IpOptsEntry *ioe)
  */
 #define IPV6_ADDR_SCOPE_NODELOCAL       0x01
 #define IPV6_ADDR_SCOPE_LINKLOCAL       0x02
-static bool needs_scope_id(uint32_t *src_addr)
+bool needs_scope_id(uint32_t *src_addr)
 {
 	if ((src_addr[0] & htonl(0xFF00000)) == htonl(0xFF000000)) {
 		if (src_addr[1] & (IPV6_ADDR_SCOPE_LINKLOCAL|IPV6_ADDR_SCOPE_NODELOCAL))
@@ -538,6 +541,9 @@ static int collect_one_inetsk(void *o, ProtobufCMessage *base, struct cr_img *i)
 		return -1;
 	fixup_sock_net_ns_id(&ii->ie->ns_id, &ii->ie->has_ns_id);
 
+    if (opts.pico_pin_inet_sks)
+        return file_desc_add(&ii->d, ii->ie->id, &pico_inet_desc_ops);
+
 	return file_desc_add(&ii->d, ii->ie->id, &inet_desc_ops);
 }
 
@@ -622,6 +628,7 @@ int restore_ip_opts(int sk, IpOptsEntry *ioe)
 
 	return ret;
 }
+
 static int open_inet_sk(struct file_desc *d, int *new_fd)
 {
 	struct fdinfo_list_entry *fle = file_master(d);

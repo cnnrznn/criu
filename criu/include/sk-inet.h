@@ -89,4 +89,10 @@ union libsoccr_addr;
 int restore_sockaddr(union libsoccr_addr *sa,
 		int family, u32 pb_port, u32 *pb_addr, u32 ifindex);
 
+extern int dump_ip_opts(int sk, IpOptsEntry *ioe);
+extern void show_one_inet_img(const char *act, const InetSkEntry *e);
+extern void show_one_inet(const char *act, const struct inet_sk_desc *sk);
+extern struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto);
+bool needs_scope_id(uint32_t *src_addr);
+
 #endif /* __CR_SK_INET_H__ */

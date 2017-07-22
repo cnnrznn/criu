@@ -291,10 +291,7 @@ static int xfer_pages(struct page_pipe *pp, struct page_xfer *xfer, bool lazy)
 	 *           pre-dump action (see pre_dump_one_task)
 	 */
 	timing_start(TIME_MEMWRITE);
-    if (opts.pico_cache)
-        ret = pico_page_xfer_dump_pages(xfer, pp, 0, !lazy);
-    else
-        ret = page_xfer_dump_pages(xfer, pp, 0, !lazy);
+    ret = pico_page_xfer_dump_pages(xfer, pp, 0, !lazy);
 	timing_stop(TIME_MEMWRITE);
 
 	return ret;
@@ -932,6 +929,9 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
                 uint32_t nrp;
                 void *p;
                 cpr.seek_pagemap(&cpr, va);
+                if (cpr.cvaddr < va)
+                    cpr.skip_pages(&cpr, va - cpr.cvaddr);
+                //pr_debug("CONNOR: cpr.cvaddr = 0x%lx, iov_base = 0x%lx\n", cpr.cvaddr, (long unsigned)iov.iov_base);
                 while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
                     end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
                     (uint64_t)(iov.iov_base+iov.iov_len));
@@ -948,8 +948,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 
                     if (cpr.pe->version == pr->pe->version
                             && cpr.pe->flags & PE_PRESENT) {
-                        pr_debug("CONNOR: restoring %d pages at 0x%lx into 0x%lx from cache\n",
-                        nrp, cpr.cvaddr, (unsigned long)p);
+                        //pr_debug("CONNOR: restoring %d pages at 0x%lx into 0x%lx from cache\n", nrp, cpr.cvaddr, (unsigned long)p);
 
                         ret = cpr.read_pages(&cpr, cpr.cvaddr, nrp, p, 0);
                         if (ret < 0)
@@ -1079,16 +1078,16 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 		}
 	}
 
-while (plhead != NULL) {
-    //pr_debug("CONNOR: 0x%lx\n", plhead->addr);
-    int madr = madvise((void*)plhead->addr, plhead->size, MADV_DONTNEED);
-    if (madr < 0) {
-        pr_err("CONNOR: madvise(..., MADV_DONTNEED) failed\n");
-        exit(1);
-    }
+    while (plhead != NULL) {
+        //pr_debug("CONNOR: 0x%lx\n", plhead->addr);
+        int madr = madvise((void*)plhead->addr, plhead->size, MADV_DONTNEED);
+        if (madr < 0) {
+            //pr_err("CONNOR: madvise(..., MADV_DONTNEED) failed\n");
+            exit(1);
+        }
 
-    plhead = plhead->next;
-}
+        plhead = plhead->next;
+    }
 
 err_read:
     if (opts.pico_cache)

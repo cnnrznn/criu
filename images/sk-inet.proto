@@ -44,4 +44,6 @@ message inet_sk_entry {
 	optional string			ifname		= 17;
 	optional uint32			ns_id		= 18;
 	optional sk_shutdown		shutdown	= 19;
+
+    optional uint32         pico_addr = 20;
 }

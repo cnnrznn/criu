@@ -24,7 +24,7 @@
 
 #include "pico-disk_serve.h"
 
-int page_server_sk = -1;
+static int page_server_sk = -1;
 
 static void psi2iovec(struct page_server_iov *ps, struct iovec *iov)
 {
