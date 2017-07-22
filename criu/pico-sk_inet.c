@@ -318,12 +318,8 @@ pico_collect_one_file(void *o, ProtobufCMessage *base, struct cr_img *i)
 
 	fe = pb_msg(base, FileEntry);
 
-    pr_debug("CONNOR: found file with id,type: %d, %d\n", fe->id, fe->type);
-
     if (fe->type != FD_TYPES__INETSK)
         return ret;
-
-    pr_debug("CONNOR: collecting inetsk file entry %d\n", fe->id);
 
     return collect_entry(&fe->isk->base, &pico_inet_sk_cinfo);
 }
@@ -390,8 +386,6 @@ pico_collect_cache_inet_sk(void *o, ProtobufCMessage *base, struct cr_img *i)
     struct inet_sk_info *ii = o;
     ii->ie = pb_msg(base, InetSkEntry);
 
-    pr_debug("CONNOR: adding inetsk id %d to list\n", ii->ie->id);
-
     inet_sk_ents[inet_data_size] = ii->ie;
     inet_data_size++;
 
@@ -429,36 +423,25 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
     // populate array, sort inetskentry array and use for binary search
     array skarr;
     array_init(&skarr, inet_data_size, comp_InetSkEntry);
-    for (i=0; i<inet_data_size; i++) {
+    for (i=0; i<inet_data_size; i++)
         skarr.elems[i] = inet_sk_ents[i];
-        pr_debug("CONNOR: %d\n", inet_sk_ents[i]->id);
-    }
     quicksort(0, skarr.size-1, &skarr);
 
     while (1) {
         FdinfoEntry *e;
         int ret_fd;
 
-        //pr_debug("CONNOR: trying to read one old fdinfo!\n");
         ret_fd = pb_read_one_eof(fdimg, &e, PB_FDINFO);
         if (ret_fd <= 0)
             break;
-        //pr_debug("CONNOR: successfully read one old fdinfo!\n");
 
         // 2. if fdinfo->fd has not been dumped (is not in fdarr):
         int other = e->fd;
-        //pr_debug("CONNOR: before fdarr binsearch\n");
         if (!binsearch(fdarr, &other, 0, fdarr_size-1)) {
-            //pr_debug("CONNOR: fdarr binsearch success\n");
-
             // 2b. dump old inetsk entry
             InetSkEntry other_inet;
             other_inet.id = e->id;
-            pr_debug("CONNOR: skarr binsearch for %d\n", e->id);
             InetSkEntry *ie = binsearch(&skarr, &other_inet, 0, skarr.size-1);
-
-            if (ie)
-                pr_debug("CONNOR: skarr binsearch found %d\n", ie->id);
 
             if (ie != NULL && ie->pico_addr != opts.pico_addr.s_addr) {
 	            FileEntry fe = FILE_ENTRY__INIT;
@@ -468,11 +451,11 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
 
                 pb_write_one(img_from_set(glob_imgset, CR_FD_FILES), &fe, PB_FILE);
                 // TODO BUG only dump InetSkEntry once
-                pr_debug("CONNOR: copied old inetsk!\n");
 
                 // 2a. dump old fdinfo
                 pb_write_one(img, e, PB_FDINFO);
-                pr_debug("CONNOR: copied old fdinfo!\n");
+
+                pr_debug("CONNOR: copied cached fd %d\n", e->fd);
             }
             else {
                 pr_debug("CONNOR: skipping cached fd\n");
