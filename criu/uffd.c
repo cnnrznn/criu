@@ -98,6 +98,8 @@ static LIST_HEAD(lpis);
 static LIST_HEAD(exiting_lpis);
 static LIST_HEAD(pending_lpis);
 static int epollfd;
+static struct epoll_event *events;
+static int nr_fds;
 
 static int handle_uffd_event(struct epoll_rfd *lpfd);
 
@@ -939,6 +941,20 @@ static int handle_fork(struct lazy_pages_info *parent_lpi, struct uffd_msg *msg)
 
 	dup_page_read(&lpi->parent->pr, &lpi->pr);
 
+    if (opts.pico_restore) {
+        nr_fds++;
+
+        events = xrealloc(events, sizeof(struct epoll_event) * (nr_fds));
+        if (!events)
+            return -1;
+
+        if (epoll_add_rfd(epollfd, &lpi->lpfd))
+            return -1;
+
+        list_del_init(&lpi->l);
+        list_add_tail(&lpi->l, &lpis);
+    }
+
 	return 1;
 
 out:
@@ -1178,8 +1194,6 @@ close_uffd:
 
 int cr_lazy_pages(bool daemon)
 {
-	struct epoll_event *events;
-	int nr_fds;
 	int lazy_sk;
 	int ret;
 
