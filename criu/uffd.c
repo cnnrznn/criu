@@ -1085,14 +1085,14 @@ static int handle_requests(int epollfd, struct epoll_event *events, int nr_fds)
 		if (ret < 0)
 			goto out;
 
-        if (opts.pico_restore)
-            continue;
-
 		if (ret > 0) {
 			if (complete_forks(epollfd, &events, &nr_fds))
 				return -1;
 			continue;
 		}
+
+        if (opts.pico_restore)
+            continue;
 
 		if (poll_timeout)
 			pr_debug("Start handling remaining pages\n");
