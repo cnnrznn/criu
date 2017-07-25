@@ -880,13 +880,15 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 	unsigned int nr_lazy = 0;
 	unsigned long va;
 
+    bool pico_has_cache = 0;
+
     struct page_read cpr;
     struct pico_page_list *plhead = NULL;
     if (opts.pico_cache) {
         int dfd = open(opts.pico_cache, O_RDONLY);
         ret = open_page_read_at(dfd, vpid(t), &cpr, PR_TASK);
-        if(ret <= 0)
-            return -1;
+        if(ret > 0)
+            pico_has_cache = 1;
         close(dfd);
     }
 
@@ -920,7 +922,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 		 * on demand.
 		 */
 		if (opts.lazy_pages && pagemap_lazy(pr->pe)) {
-            if (opts.pico_cache) {
+            if (opts.pico_cache && pico_has_cache) {
                 /*
                 * for every cached pme in the region of this pme,
                 * if the version # matches, load it into memory
@@ -1090,7 +1092,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
     }
 
 err_read:
-    if (opts.pico_cache)
+    if (opts.pico_cache && pico_has_cache)
         cpr.close(&cpr);
 
 	if (pr->sync(pr))
