@@ -26,6 +26,12 @@
 #define PB_ALEN_INET    1
 #define PB_ALEN_INET6   4
 
+static int next_id = 100000;
+
+static struct dumped_id dumped_sks_data[1024] = { 0 };
+static int dumped_sks_size = 0;
+static array dumped_sks;
+
 static InetSkEntry *inet_sk_ents[1024] = { 0 };
 static int inet_data_size = 0;
 //static char has_collect_inet_sks = 0;
@@ -47,6 +53,20 @@ struct fdtype_ops pico_inet_dump_ops = {
     .type       = FD_TYPES__INETSK,
     .dump       = pico_dump_one_inet_fd,
 };
+
+static char
+comp_dumped_id(void *a, void *b)
+{
+    struct dumped_id *x = a;
+    struct dumped_id *y = b;
+
+    if (x->old_id < y->old_id)
+        return 1;
+    else if (x->old_id > y->old_id)
+        return -1;
+    else
+        return 0;
+}
 
 static int
 pico_do_dump_one_inet_fd(int lfd, u32 id, const struct fd_parms *p, int family)
@@ -395,13 +415,17 @@ pico_collect_cache_inet_sk(void *o, ProtobufCMessage *base, struct cr_img *i)
 void
 pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct pstree_item *item, struct cr_img *img)
 {
+    int i;
     struct cr_img *fdimg;
 
     if (!opts.pico_cache)
         return;
 
+    array_init(&dumped_sks, 1024, comp_dumped_id);
+    for (i = 0; i < dumped_sks_size; i++)
+        dumped_sks.elems[i] = &dumped_sks_data[i];
+
     // 0. populate fdarr with fdarr_data
-    int i;
     for (i=0; i<fdarr_size; i++)
         fdarr->elems[i] = &fdarr_data[i];
 
@@ -444,13 +468,35 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
             InetSkEntry *ie = binsearch(&skarr, &other_inet, 0, skarr.size-1);
 
             if (ie != NULL && ie->pico_addr != opts.pico_addr.s_addr) {
-	            FileEntry fe = FILE_ENTRY__INIT;
-                fe.type = FD_TYPES__INETSK;
-                fe.id = ie->id;
-                fe.isk = ie;
+                quicksort(0, dumped_sks_size-1, &dumped_sks);
+                struct dumped_id other_id = { .old_id = e->id };
+                struct dumped_id *di = binsearch(&dumped_sks, &other_id, 0, dumped_sks_size-1);
+                if (di == NULL) {
+                    // record dumped_id; create new_id
+                    dumped_sks_data[dumped_sks_size].old_id = e->id;
+                    dumped_sks_data[dumped_sks_size].new_id = next_id;
+                    dumped_sks.elems[dumped_sks_size] = &dumped_sks_data[dumped_sks_size];
 
-                pb_write_one(img_from_set(glob_imgset, CR_FD_FILES), &fe, PB_FILE);
-                // TODO BUG only dump InetSkEntry once
+                    // dump file
+	                FileEntry fe = FILE_ENTRY__INIT;
+                    fe.type = FD_TYPES__INETSK;
+                    fe.id = next_id;
+                    fe.isk = ie;
+
+                    ie->id = next_id;
+
+                    pb_write_one(img_from_set(glob_imgset, CR_FD_FILES), &fe, PB_FILE);
+
+                    // set e->id
+                    e->id = next_id;
+
+                    next_id++;
+                    dumped_sks_size++;
+                }
+                else {
+                    // set e->id based on already dumped_id
+                    e->id = di->new_id;
+                }
 
                 // 2a. dump old fdinfo
                 pb_write_one(img, e, PB_FDINFO);
@@ -468,6 +514,7 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
     close_image(fdimg);
     close(dfd);
     array_free(&skarr);
+    array_free(&dumped_sks);
 }
 
 char

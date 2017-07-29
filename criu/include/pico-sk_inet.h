@@ -5,6 +5,11 @@
 
 #define PICO_PINNED_FD -3 /* the file descriptor was pinned on a different machine */
 
+struct dumped_id {
+    int old_id;
+    int new_id;
+};
+
 extern void pico_dump_cache_inet_sks(array*, int*, int,
                     struct pstree_item *, struct cr_img *);
 

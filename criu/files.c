@@ -301,6 +301,8 @@ int do_dump_gen_file(struct fd_parms *p, int lfd,
 	e.id	= make_gen_id(p);
 	e.fd	= p->fd;
 	e.flags = p->fd_flags;
+    e.pico_addr = opts.pico_addr.s_addr;
+    e.has_pico_addr = true;
 
 	ret = fd_id_generate(p->pid, &e, p);
 	if (ret == 1) /* new ID generated */
@@ -1112,6 +1114,12 @@ static int open_fd(struct fdinfo_list_entry *fle)
 	struct fdinfo_list_entry *flem;
 	int new_fd = -1, ret;
 
+    if (opts.pico_pin_inet_sks && fle->fe->type == FD_TYPES__INETSK &&
+            fle->fe->pico_addr != opts.pico_addr.s_addr) {
+        ret = 0;
+        goto fixup_ctty;
+    }
+
 	flem = file_master(d);
 	if (fle != flem) {
 		BUG_ON (fle->stage != FLE_INITIALIZED);
@@ -1135,9 +1143,6 @@ static int open_fd(struct fdinfo_list_entry *fle)
 	 * See setup_and_serve_out() BUG_ON for the details.
 	 */
 	ret = d->ops->open(d, &new_fd);
-
-    if (opts.pico_pin_inet_sks && new_fd == PICO_PINNED_FD)
-        goto fixup_ctty;
 
 	if (ret != -1 && new_fd >= 0) {
 		if (setup_and_serve_out(fle, new_fd) < 0)
