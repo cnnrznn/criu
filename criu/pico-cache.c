@@ -79,7 +79,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                 */
                 void *end;
 
-                //pr_debug("CONNOR: dumping prior pagemaps\n");
+                //pr_debug("CONNOR: dumping cached pagemaps\n");
 
                 while ((void*)pr.cvaddr < iov.iov_base) {
                     // find the bounds of the unloaded pme
@@ -105,8 +105,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 
                         // dump pagemap entry
                         //pr_debug("CONNOR: writing pagemap 0x%lx - 0x%lx\n", (long unsigned)vmaiov.iov_base, (long unsigned)vmaiov.iov_base + vmaiov.iov_len);
-                        xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version,
-                        pr.pe->addr, pr.pe->port);
+                        xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version, pr.pe->addr, pr.pe->port);
 
                         if ((void*)vma->e->end > tmpiov.iov_base + tmpiov.iov_len) {
                             vmaiov.iov_base = tmpiov.iov_base + tmpiov.iov_len;
@@ -235,7 +234,7 @@ pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
 
     // if all cached pme's have been dumped
     if (pr.curr_pme >= pr.nr_pmes)
-        return 0;
+        goto out;
 
     vma = list_entry(xfer->vma_area_list->h.next, typeof(*vma), list);
     vmaiov.iov_base = (void*)vma->e->start;
@@ -275,6 +274,7 @@ pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
 
     } while (pr.advance(&pr));
 
+out:
     // if multiple processes, will need to reopen a different pagemap cache
     page_read_set = 0;
     pr.close(&pr);

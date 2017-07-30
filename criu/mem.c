@@ -880,15 +880,13 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 	unsigned int nr_lazy = 0;
 	unsigned long va;
 
-    bool pico_has_cache = 0;
-
     struct page_read cpr;
     struct pico_page_list *plhead = NULL;
     if (opts.pico_cache) {
         int dfd = open(opts.pico_cache, O_RDONLY);
         ret = open_page_read_at(dfd, vpid(t), &cpr, PR_TASK);
-        if(ret > 0)
-            pico_has_cache = 1;
+        if(ret <= 0)
+            return -1;
         close(dfd);
     }
 
@@ -922,7 +920,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 		 * on demand.
 		 */
 		if (opts.lazy_pages && pagemap_lazy(pr->pe)) {
-            if (opts.pico_cache && pico_has_cache) {
+            if (opts.pico_cache) {
                 /*
                 * for every cached pme in the region of this pme,
                 * if the version # matches, load it into memory
@@ -933,10 +931,9 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
                 cpr.seek_pagemap(&cpr, va);
                 if (cpr.cvaddr < va)
                     cpr.skip_pages(&cpr, va - cpr.cvaddr);
-                //pr_debug("CONNOR: cpr.cvaddr = 0x%lx, iov_base = 0x%lx\n", cpr.cvaddr, (long unsigned)iov.iov_base);
                 while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
                     end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
-                    (uint64_t)(iov.iov_base+iov.iov_len));
+                                (uint64_t)(iov.iov_base+iov.iov_len));
 
                     while (cpr.cvaddr >= vma->e->end) {
                         if (vma->list.next == vmas)
@@ -950,7 +947,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 
                     if (cpr.pe->version == pr->pe->version
                             && cpr.pe->flags & PE_PRESENT) {
-                        //pr_debug("CONNOR: restoring %d pages at 0x%lx into 0x%lx from cache\n", nrp, cpr.cvaddr, (unsigned long)p);
+                        pr_debug("CONNOR: restoring %d pages at 0x%lx into 0x%lx from cache\n", nrp, cpr.cvaddr, (unsigned long)p);
 
                         ret = cpr.read_pages(&cpr, cpr.cvaddr, nrp, p, 0);
                         if (ret < 0)
@@ -959,6 +956,8 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
                         nr_restored += nrp;
                     }
                     else {
+                        pr_debug("CONNOR: %d pages at 0x%lx are dirty\n", nrp, cpr.cvaddr);
+
                         struct pico_page_list *plent = malloc(sizeof(struct pico_page_list));
                         plent->addr = (unsigned long)p;
                         plent->size = end - cpr.cvaddr;
@@ -1081,7 +1080,6 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 	}
 
     while (plhead != NULL) {
-        //pr_debug("CONNOR: 0x%lx\n", plhead->addr);
         int madr = madvise((void*)plhead->addr, plhead->size, MADV_DONTNEED);
         if (madr < 0) {
             //pr_err("CONNOR: madvise(..., MADV_DONTNEED) failed\n");
@@ -1092,7 +1090,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
     }
 
 err_read:
-    if (opts.pico_cache && pico_has_cache)
+    if (opts.pico_cache)
         cpr.close(&cpr);
 
 	if (pr->sync(pr))
