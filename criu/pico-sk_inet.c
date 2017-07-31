@@ -449,6 +449,7 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
     array_init(&skarr, inet_data_size, comp_InetSkEntry);
     for (i=0; i<inet_data_size; i++)
         skarr.elems[i] = inet_sk_ents[i];
+
     quicksort(0, skarr.size-1, &skarr);
 
     while (1) {
@@ -487,6 +488,10 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
 
                     pb_write_one(img_from_set(glob_imgset, CR_FD_FILES), &fe, PB_FILE);
 
+                    // reset ie->id
+                    // TODO connor's shit coding practice
+                    ie->id = dumped_sks_data[dumped_sks_size].old_id;
+
                     // set e->id
                     e->id = next_id;
 
@@ -504,7 +509,7 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
                 pr_debug("CONNOR: copied cached fd %d\n", e->fd);
             }
             else {
-                pr_debug("CONNOR: skipping cached fd\n");
+                pr_debug("CONNOR: skipping cached fd %d\n", e->fd);
             }
         }
 
