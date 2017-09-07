@@ -100,6 +100,8 @@
 
 #include "pie/pie-relocs.h"
 
+#include "migrate.h"
+
 #ifndef arch_export_restore_thread
 #define arch_export_restore_thread	__export_restore_thread
 #endif
@@ -1736,6 +1738,10 @@ static int restore_task_with_children(void *_arg)
 		pr_err("Pid %d do not match expected %d (task %d)\n",
 			pid, last_level_pid(current->pid), vpid(current));
 		set_task_cr_err(EEXIST);
+
+        if (opts.pico_crash)
+            pico_crash();
+
 		goto err;
 	}
 

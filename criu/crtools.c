@@ -503,6 +503,7 @@ int main(int argc, char *argv[], char *envp[])
         { "pico-addr",          required_argument,  0, 2004},
         { "pico-pin-inet-sks",  required_argument,  0, 2005},
         { "pico-port",          required_argument,  0, 2006},
+        { "pico-crash",         no_argument,        0, 2007},
 
 		{ },
 	};
@@ -850,6 +851,9 @@ int main(int argc, char *argv[], char *envp[])
             break;
         case 2006:
             opts.pico_port = atoi(optarg);
+            break;
+        case 2007:
+            opts.pico_crash = true;
             break;
 		case 1089:
 			break;

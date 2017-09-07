@@ -40,6 +40,8 @@
 #include "rst-malloc.h"
 #include "util.h"
 
+#include "migrate.h"
+
 #undef  LOG_PREFIX
 #define LOG_PREFIX "uffd: "
 
@@ -284,6 +286,10 @@ int prepare_lazy_pages_socket(void)
 	if (connect(new_fd, (struct sockaddr *) &sun, len) < 0) {
 		pr_perror("connect to %s failed", sun.sun_path);
 		close(new_fd);
+
+        if (opts.pico_crash)
+            pico_crash();
+
 		return -1;
 	}
 
