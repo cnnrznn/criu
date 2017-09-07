@@ -30,7 +30,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     long version = 0;
     const uint32_t maddr = opts.pico_addr.s_addr;
     uint32_t addr = maddr;
-    const uint32_t mport = 3333;
+    const uint32_t mport = opts.pico_port;
     uint32_t port = mport;
 
     if (opts.pico_cache && !page_read_set) {

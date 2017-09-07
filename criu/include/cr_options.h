@@ -132,6 +132,7 @@ struct cr_options {
     bool            pico_restore;       /* use multiple servers, pico_cache */
     struct in_addr  pico_addr;          /* IP of the current machine */
     char*           pico_pin_inet_sks;  /* path to file descriptor maintainer UNIXFD */
+    int             pico_port;          /* port to use for page-server */
 };
 
 extern struct cr_options opts;
