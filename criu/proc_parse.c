@@ -48,6 +48,8 @@
 
 #include <stdlib.h>
 
+//#include "pico-pin.h"
+
 #ifndef SIGEV_SIGNAL
 #define SIGEV_SIGNAL    0       /* notify via signal */
 #endif

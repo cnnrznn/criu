@@ -8,6 +8,9 @@
 #include <string.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <sys/time.h>
+
+extern void timediff(struct timeval *from, struct timeval *to);
 
 extern void vprint_on_level(unsigned int loglevel, const char *format,
 		va_list params);

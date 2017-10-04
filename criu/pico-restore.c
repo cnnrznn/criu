@@ -3,6 +3,8 @@
 #include <netinet/in.h>
 
 #include "pico-restore.h"
+//#include "pico-pin.h"
+#include "pico-soft_mig.h"
 
 #include "array.h"
 #include "binsearch.h"
@@ -160,6 +162,9 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     ret = pr->seek_pagemap(pr, addr);
     if (!ret)
         return -1;
+
+    if (pico_soft_migrate(pr->pe->addr))
+        goto jail;
 
     if (page_servers_ct == 0) { // fist entry
         page_servers[0].addr = pr->pe->addr;
