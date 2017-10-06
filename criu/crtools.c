@@ -501,7 +501,7 @@ int main(int argc, char *argv[], char *envp[])
         { "pico-cache",         required_argument,  0, 2002},
         { "pico-restore",       no_argument,        0, 2003},
         { "pico-addr",          required_argument,  0, 2004},
-        { "pico-pin-inet-sks",  required_argument,  0, 2005},
+        { "pico-pin-fds",       required_argument,  0, 2005},
         { "pico-port",          required_argument,  0, 2006},
         { "pico-crash",         no_argument,        0, 2007},
 
@@ -847,7 +847,7 @@ int main(int argc, char *argv[], char *envp[])
                 return -1;
             break;
         case 2005:
-            opts.pico_pin_inet_sks = optarg;
+            opts.pico_pin_fds = optarg;
             break;
         case 2006:
             opts.pico_port = atoi(optarg);

@@ -593,8 +593,8 @@ int dump_task_files_seized(struct parasite_ctl *ctl, struct pstree_item *item,
 
 	pr_info("----------------------------------------\n");
 
-    if (opts.pico_pin_inet_sks)
-        pico_dump_cache_inet_sks(&fdarr, fdarr_data, fdarr_size, item, img);
+    if (opts.pico_pin_fds)
+        pico_dump_cache_fds(&fdarr, fdarr_data, fdarr_size, item, img);
 
 err:
     array_free(&fdarr);
@@ -1114,7 +1114,8 @@ static int open_fd(struct fdinfo_list_entry *fle)
 	struct fdinfo_list_entry *flem;
 	int new_fd = -1, ret;
 
-    if (opts.pico_pin_inet_sks && fle->fe->type == FD_TYPES__INETSK &&
+    if (opts.pico_pin_fds &&
+            (fle->fe->type == FD_TYPES__INETSK || fle->fe->type == FD_TYPES__REG) &&
             fle->fe->pico_addr != opts.pico_addr.s_addr) {
         ret = 0;
         goto fixup_ctty;

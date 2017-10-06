@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 
 #include "pico-restore.h"
-//#include "pico-pin.h"
+#include "pico-pin.h"
 #include "pico-soft_mig.h"
 
 #include "array.h"

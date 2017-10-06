@@ -28,15 +28,13 @@
 
 static int next_id = 100000;
 
-static struct dumped_id dumped_sks_data[1024] = { 0 };
-static int dumped_sks_size = 0;
-static array dumped_sks;
+static struct dumped_id dumped_fds_data[1024] = { 0 };
+static int dumped_fds_size = 0;
+static array dumped_fds;
 
-static InetSkEntry *inet_sk_ents[1024] = { 0 };
-static int inet_data_size = 0;
-//static char has_collect_inet_sks = 0;
+static FileEntry *file_ents[1024] = { 0 };
+static int file_ents_size = 0;
 
-static int pico_collect_cache_inet_sk(void*, ProtobufCMessage*, struct cr_img *);
 static int pico_collect_one_file(void *o, ProtobufCMessage *base, struct cr_img *i);
 
 static int pico_open_inet_sk(struct file_desc *d, int *new_fd);
@@ -112,9 +110,6 @@ pico_do_dump_one_inet_fd(int lfd, u32 id, const struct fd_parms *p, int family)
 	ie.opts		= &skopts;
 	ie.ip_opts	= &ipopts;
 
-    ie.pico_addr = opts.pico_addr.s_addr;
-    ie.has_pico_addr = true;
-
 	ie.n_src_addr = PB_ALEN_INET;
 	ie.n_dst_addr = PB_ALEN_INET;
 	if (ie.family == AF_INET6) {
@@ -185,7 +180,7 @@ pico_do_dump_one_inet_fd(int lfd, u32 id, const struct fd_parms *p, int family)
     int rsk = socket(AF_UNIX, SOCK_STREAM, 0);
     struct sockaddr_un rskaddr = { 0 };
     rskaddr.sun_family = AF_UNIX;
-    strcpy(rskaddr.sun_path, opts.pico_pin_inet_sks);
+    strcpy(rskaddr.sun_path, opts.pico_pin_fds);
 
     if (connect(rsk, (struct sockaddr *)&rskaddr, sizeof(rskaddr))) {
         pr_err("connect");
@@ -242,24 +237,16 @@ static int
 pico_open_inet_sk(struct file_desc *d, int *new_fd)
 {
     int ret = -1;
-    struct inet_sk_info *ii;
 	struct fdinfo_list_entry *fle = file_master(d);
 
 	if (fle->stage >= FLE_OPEN)
 		return pico_post_open_inet_sk(d, fle->fe->fd);
 
-    ii = container_of(d, struct inet_sk_info, d);
-    if (ii->ie->pico_addr != opts.pico_addr.s_addr) {
-        pr_debug("CONNOR: (fd, fd addr, pico_addr) (%d, %d, %d)\n", fle->fe->fd, ii->ie->pico_addr, opts.pico_addr.s_addr);
-        *new_fd = PICO_PINNED_FD;
-        return 0;
-    }
-
     // recv file descriptor from sk-holder
     int rsk = socket(AF_UNIX, SOCK_STREAM, 0);
     struct sockaddr_un rskaddr = { 0 };
     rskaddr.sun_family = AF_UNIX;
-    strcpy(rskaddr.sun_path, opts.pico_pin_inet_sks);
+    strcpy(rskaddr.sun_path, opts.pico_pin_fds);
 
     if (connect(rsk, (struct sockaddr *)&rskaddr, sizeof(rskaddr))) {
         pr_err("connect");
@@ -315,13 +302,6 @@ pico_post_open_inet_sk(struct file_desc *d, int sk)
     return 0;
 }
 
-static struct collect_image_info pico_inet_sk_cinfo = {
-    .fd_type = CR_FD_INETSK,
-    .pb_type = PB_INET_SK,
-    .priv_size = sizeof(struct inet_sk_info),
-    .collect = pico_collect_cache_inet_sk,
-};
-
 struct collect_image_info pico_files_cinfo = {
 	.fd_type = CR_FD_FILES,
 	.pb_type = PB_FILE,
@@ -333,15 +313,14 @@ struct collect_image_info pico_files_cinfo = {
 static int
 pico_collect_one_file(void *o, ProtobufCMessage *base, struct cr_img *i)
 {
-	int ret = 0;
 	FileEntry *fe;
 
 	fe = pb_msg(base, FileEntry);
 
-    if (fe->type != FD_TYPES__INETSK)
-        return ret;
+    file_ents[file_ents_size] = fe;
+    file_ents_size++;
 
-    return collect_entry(&fe->isk->base, &pico_inet_sk_cinfo);
+    return 0;
 }
 
 static int
@@ -399,21 +378,8 @@ collect_image_at_once(int dfd, struct collect_image_info *cinfo)
     return ret;
 }
 
-static int
-pico_collect_cache_inet_sk(void *o, ProtobufCMessage *base, struct cr_img *i)
-{
-    // 1. add inetskentry to inet_sk_ents
-    struct inet_sk_info *ii = o;
-    ii->ie = pb_msg(base, InetSkEntry);
-
-    inet_sk_ents[inet_data_size] = ii->ie;
-    inet_data_size++;
-
-    return 0;
-}
-
 void
-pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct pstree_item *item, struct cr_img *img)
+pico_dump_cache_fds(array *fdarr, int *fdarr_data, int fdarr_size, struct pstree_item *item, struct cr_img *img)
 {
     int i;
     struct cr_img *fdimg;
@@ -421,9 +387,9 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
     if (!opts.pico_cache)
         return;
 
-    array_init(&dumped_sks, 1024, comp_dumped_id);
-    for (i = 0; i < dumped_sks_size; i++)
-        dumped_sks.elems[i] = &dumped_sks_data[i];
+    array_init(&dumped_fds, 1024, comp_dumped_id);
+    for (i = 0; i < dumped_fds_size; i++)
+        dumped_fds.elems[i] = &dumped_fds_data[i];
 
     // 0. populate fdarr with fdarr_data
     for (i=0; i<fdarr_size; i++)
@@ -446,9 +412,9 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
 
     // populate array, sort inetskentry array and use for binary search
     array skarr;
-    array_init(&skarr, inet_data_size, comp_InetSkEntry);
-    for (i=0; i<inet_data_size; i++)
-        skarr.elems[i] = inet_sk_ents[i];
+    array_init(&skarr, file_ents_size, comp_FileEntry);
+    for (i=0; i<file_ents_size; i++)
+        skarr.elems[i] = file_ents[i];
 
     quicksort(0, skarr.size-1, &skarr);
 
@@ -463,40 +429,46 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
         // 2. if fdinfo->fd has not been dumped (is not in fdarr):
         int other = e->fd;
         if (!binsearch(fdarr, &other, 0, fdarr_size-1)) {
-            // 2b. dump old inetsk entry
-            InetSkEntry other_inet;
-            other_inet.id = e->id;
-            InetSkEntry *ie = binsearch(&skarr, &other_inet, 0, skarr.size-1);
+            // 2b. dump old file entry
+            FileEntry other_file;
+            other_file.id = e->id;
+            FileEntry *fe = binsearch(&skarr, &other_file, 0, skarr.size-1);
 
-            if (ie != NULL && ie->pico_addr != opts.pico_addr.s_addr) {
-                quicksort(0, dumped_sks_size-1, &dumped_sks);
+            if (fe != NULL && e->pico_addr != opts.pico_addr.s_addr) {
+                quicksort(0, dumped_fds_size-1, &dumped_fds);
                 struct dumped_id other_id = { .old_id = e->id };
-                struct dumped_id *di = binsearch(&dumped_sks, &other_id, 0, dumped_sks_size-1);
+                struct dumped_id *di = binsearch(&dumped_fds, &other_id, 0, dumped_fds_size-1);
                 if (di == NULL) {
                     // record dumped_id; create new_id
-                    dumped_sks_data[dumped_sks_size].old_id = e->id;
-                    dumped_sks_data[dumped_sks_size].new_id = next_id;
-                    dumped_sks.elems[dumped_sks_size] = &dumped_sks_data[dumped_sks_size];
+                    dumped_fds_data[dumped_fds_size].old_id = e->id;
+                    dumped_fds_data[dumped_fds_size].new_id = next_id;
+                    dumped_fds.elems[dumped_fds_size] = &dumped_fds_data[dumped_fds_size];
+
+                    // fixup new id
+                    fe->id = next_id;
+                    switch (fe->type) {
+                        case FD_TYPES__INETSK:
+                            fe->isk->id = next_id;
+                            break;
+                        case FD_TYPES__REG:
+                            fe->reg->id = next_id;
+                            break;
+                        default:
+                            break;
+                    }
 
                     // dump file
-	                FileEntry fe = FILE_ENTRY__INIT;
-                    fe.type = FD_TYPES__INETSK;
-                    fe.id = next_id;
-                    fe.isk = ie;
-
-                    ie->id = next_id;
-
-                    pb_write_one(img_from_set(glob_imgset, CR_FD_FILES), &fe, PB_FILE);
+                    pb_write_one(img_from_set(glob_imgset, CR_FD_FILES), fe, PB_FILE);
 
                     // reset ie->id
                     // TODO connor's shit coding practice
-                    ie->id = dumped_sks_data[dumped_sks_size].old_id;
+                    fe->id = dumped_fds_data[dumped_fds_size].old_id;
 
                     // set e->id
                     e->id = next_id;
 
                     next_id++;
-                    dumped_sks_size++;
+                    dumped_fds_size++;
                 }
                 else {
                     // set e->id based on already dumped_id
@@ -519,7 +491,7 @@ pico_dump_cache_inet_sks(array *fdarr, int *fdarr_data, int fdarr_size, struct p
     close_image(fdimg);
     close(dfd);
     array_free(&skarr);
-    array_free(&dumped_sks);
+    array_free(&dumped_fds);
 }
 
 char
@@ -537,10 +509,10 @@ comp_fds(void *a, void *b)
 }
 
 char
-comp_InetSkEntry(void *a, void *b)
+comp_FileEntry(void *a, void *b)
 {
-    InetSkEntry *x = a;
-    InetSkEntry *y = b;
+    FileEntry *x = a;
+    FileEntry *y = b;
 
     if (x->id < y->id)
         return 1;

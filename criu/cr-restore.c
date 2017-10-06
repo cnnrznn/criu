@@ -2292,7 +2292,7 @@ skip_ns_bouncing:
 	if (write_restored_pid())
 		goto out_kill;
 
-	if (!opts.check_only && !opts.pico_pin_inet_sks)
+	if (!opts.check_only && !opts.pico_pin_fds)
 		/* Unlock network before disabling repair mode on sockets */
 		network_unlock();
 

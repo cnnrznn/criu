@@ -266,7 +266,7 @@ struct inet_sk_desc *gen_uncon_sk(int lfd, const struct fd_parms *p, int proto)
 		}
 
 		if (info.tcpi_state != TCP_CLOSE &&
-                !opts.pico_pin_inet_sks) {
+                !opts.pico_pin_fds) {
 			pr_err("Socket state %d obtained but expected %d\n",
 			       info.tcpi_state, TCP_CLOSE);
 			goto err;
@@ -541,7 +541,7 @@ static int collect_one_inetsk(void *o, ProtobufCMessage *base, struct cr_img *i)
 		return -1;
 	fixup_sock_net_ns_id(&ii->ie->ns_id, &ii->ie->has_ns_id);
 
-    if (opts.pico_pin_inet_sks)
+    if (opts.pico_pin_fds)
         return file_desc_add(&ii->d, ii->ie->id, &pico_inet_desc_ops);
 
 	return file_desc_add(&ii->d, ii->ie->id, &inet_desc_ops);

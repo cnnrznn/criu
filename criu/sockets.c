@@ -572,7 +572,7 @@ int dump_socket(struct fd_parms *p, int lfd, struct cr_img *img)
 		ops = &unix_dump_ops;
 		break;
 	case AF_INET:
-        if (opts.pico_pin_inet_sks)
+        if (opts.pico_pin_fds)
             ops = &pico_inet_dump_ops;
         else
             ops = &inet_dump_ops;
