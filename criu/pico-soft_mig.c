@@ -22,7 +22,7 @@ pico_soft_migrate(unsigned int addr)
     if (head == NULL) {
         head = malloc(sizeof(struct sm_node_t));
         head->addr = -1;
-        head->next = NULL;
+        head->next = head;
         num_nodes++;
     }
 
@@ -68,13 +68,7 @@ pico_soft_migrate(unsigned int addr)
     }
 
     // increment head, create new node if needed
-    if (head->next == NULL) {
-        head->next = malloc(sizeof(struct sm_node_t));
-        head->next->next = head;
-        head->next->addr = -1;
-        num_nodes++;
-    }
-    else if (num_nodes < SM_NODE_LIMIT) {
+    if (num_nodes < SM_NODE_LIMIT) {
         struct sm_node_t *u = malloc(sizeof(struct sm_node_t));
         u->addr = -1;
         u->next = head->next;
