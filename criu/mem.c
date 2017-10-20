@@ -931,6 +931,24 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
                 cpr.seek_pagemap(&cpr, va);
                 if (cpr.cvaddr < va)
                     cpr.skip_pages(&cpr, va - cpr.cvaddr);
+
+                // pme is not in cache, flush entire region
+                if ((void*)cpr.cvaddr >= iov.iov_base+iov.iov_len) {
+                    while (pr->cvaddr >= vma->e->end) {
+                        if (vma->list.next == vmas)
+                            goto err_addr;
+                        vma = list_entry(vma->list.next, struct vma_area, list);
+                    }
+                    off = pr->cvaddr - vma->e->start;
+                    p = decode_pointer(off + vma->premmaped_addr);
+
+                    struct pico_page_list *plent = malloc(sizeof(struct pico_page_list));
+                    plent->addr = (unsigned long)p;
+                    plent->size = pr->pe->nr_pages * PAGE_SIZE;
+                    plent->next = plhead;
+                    plhead = plent;
+                }
+
                 while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
                     end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
                                 (uint64_t)(iov.iov_base+iov.iov_len));
