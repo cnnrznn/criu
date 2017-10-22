@@ -10,10 +10,10 @@ extern int
 pico_page_xfer_dump_pages(struct page_xfer *, struct page_pipe *,
 				unsigned long off, bool dump_lazy);
 
-extern void
-pico_reset_page_read();
-
 extern int
 pico_dump_end_cached_pagemaps(struct page_xfer *);
+
+extern void
+pico_reset_pagemap_cache();
 
 #endif /* _PJ_CACHE_H */

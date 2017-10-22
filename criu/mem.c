@@ -481,10 +481,13 @@ int parasite_dump_pages_seized(struct pstree_item *item,
 
 	ret = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, false);
     if (opts.pico_dump) {
-        pico_reset_page_read();
         mdc->lazy = true;
         ret_meta = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, true);
     }
+
+    if (opts.pico_cache)
+        pico_reset_pagemap_cache();
+
 	if (ret || ret_meta) {
 		pr_err("Can't dump page with parasite\n");
 		/* Parasite will unprotect VMAs after fail in fini() */

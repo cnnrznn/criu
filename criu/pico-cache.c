@@ -15,6 +15,20 @@ static struct page_read pr = { 0 };
 static struct iovec ciov;
 static int page_read_set = 0;
 
+static void
+pico_reset_page_read()
+{
+    /*
+     * In between full and lazy dump,
+     * reset the page reader for the cache
+     */
+
+    pr.reset(&pr);
+    pr.advance(&pr);
+    ciov.iov_base = (void*)pr.pe->vaddr;
+    ciov.iov_len = pr.pe->nr_pages * PAGE_SIZE;
+}
+
 int
 pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 			 unsigned long off, bool dump_lazy)
@@ -210,22 +224,6 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 
 }
 
-void
-pico_reset_page_read()
-{
-    /*
-     * In between full and lazy dump,
-     * reset the page reader for the cache
-     */
-
-    if (opts.pico_cache) {
-        pr.reset(&pr);
-        pr.advance(&pr);
-        ciov.iov_base = (void*)pr.pe->vaddr;
-        ciov.iov_len = pr.pe->nr_pages * PAGE_SIZE;
-    }
-}
-
 int
 pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
 {
@@ -275,9 +273,14 @@ pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
     } while (pr.advance(&pr));
 
 out:
+    pico_reset_page_read();
+    return 0;
+}
+
+void
+pico_reset_pagemap_cache()
+{
     // if multiple processes, will need to reopen a different pagemap cache
     page_read_set = 0;
     pr.close(&pr);
-
-    return 0;
 }
