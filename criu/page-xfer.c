@@ -681,11 +681,39 @@ static int page_server_get_pages(int sk, struct page_server_iov *pi)
 	return 0;
 }
 
-static int page_server_serve(int sk)
+static int page_server_serve(int sk, int lsk)
 {
 	int ret = -1;
 	bool flushed = false;
 	bool receiving_pages = !opts.lazy_pages && !opts.disk_serve;
+
+#define PICO_EPFD_SIZE 10
+    int epfd = -1;
+    struct epoll_event events[PICO_EPFD_SIZE];
+    struct epoll_event event;
+    int nevents;
+
+    if (opts.disk_serve) {
+        // create epoll instance
+        epfd = epoll_create(1);
+        if (epfd < 0) {
+            pr_err("epoll_create\n");
+            return -1;
+        }
+
+        // add lsk, sk to instance
+        event.events = EPOLLIN;
+        event.data.fd = lsk;
+        if (epoll_ctl(epfd, EPOLL_CTL_ADD, lsk, &event)) {
+            pr_err("epoll_ctl\n");
+            return -1;
+        }
+        event.data.fd = sk;
+        if (epoll_ctl(epfd, EPOLL_CTL_ADD, sk, &event)) {
+            pr_err("epoll_ctl\n");
+            return -1;
+        }
+    }
 
 	if (receiving_pages) {
 		/*
@@ -712,14 +740,52 @@ static int page_server_serve(int sk)
 		struct page_server_iov pi;
 		u32 cmd;
 
-		ret = recv(sk, &pi, sizeof(pi), MSG_WAITALL);
-		if (!ret)
-			break;
+        if (opts.disk_serve) {
+            // epoll_wait
+            nevents = epoll_wait(epfd, events, PICO_EPFD_SIZE, -1);
+            if (nevents < 0) {
+                pr_err("epoll_wait\n");
+                return -1;
+            }
+
+            pr_debug("CONNOR: nevents = %d\n", nevents);
+
+            if (events[0].data.fd == lsk) {
+                // if lsk, open new connection
+                struct sockaddr_in addr;
+                socklen_t addrlen = sizeof(struct sockaddr_in);
+                int nsk;
+                if ((nsk = accept(lsk, &addr, &addrlen)) < 0) {
+                    pr_err("accept\n");
+                    return -1;
+                }
+		        tcp_cork(nsk, true);
+                event.data.fd = nsk;
+                if (epoll_ctl(epfd, EPOLL_CTL_ADD, nsk, &event)) {
+                    pr_err("epoll_ctl\n");
+                    return -1;
+                }
+                continue;
+            }
+            else {
+                // else, serve as normal
+                ret = recv(events[0].data.fd, &pi, sizeof(pi), MSG_WAITALL);
+                if (ret != sizeof(pi)) {
+                    epoll_ctl(epfd, EPOLL_CTL_DEL, events[0].data.fd, NULL);
+                    continue;
+                }
+            }
+        }
+        else {
+            ret = recv(sk, &pi, sizeof(pi), MSG_WAITALL);
+            if (!ret)
+                break;
+        }
 
 		if (ret != sizeof(pi)) {
 			pr_perror("Can't read pagemap from socket");
 			ret = -1;
-			break;
+            break;
 		}
 
 		flushed = false;
@@ -765,7 +831,7 @@ static int page_server_serve(int sk)
 		}
 		case PS_IOV_GET:
             if (opts.disk_serve)
-                ret = disk_serve_get_pages(sk, &pi);
+                ret = disk_serve_get_pages(events[0].data.fd, &pi);
             else
 		        ret = page_server_get_pages(sk, &pi);
 			break;
@@ -775,8 +841,8 @@ static int page_server_serve(int sk)
 			break;
 		}
 
-		if (ret || (pi.cmd == PS_IOV_FLUSH_N_CLOSE))
-			break;
+		//if (ret || (pi.cmd == PS_IOV_FLUSH_N_CLOSE))
+			//break;
 	}
 
 	if (receiving_pages && !ret && !flushed) {
@@ -954,7 +1020,7 @@ no_server:
 		return ret > 0 ? 0 : -1;
 
 	if (ask >= 0)
-		ret = page_server_serve(ask);
+		ret = page_server_serve(ask, sk);
 
     if (opts.disk_serve)
         disk_serve_cleanup();

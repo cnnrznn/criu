@@ -1230,7 +1230,7 @@ int run_tcp_server(bool daemon_mode, int *ask, int cfd, int sk)
 			pr_info("Accepted connection from %s:%u\n",
 					inet_ntoa(caddr.sin_addr),
 					(int)ntohs(caddr.sin_port));
-		close(sk);
+		//close(sk);
 	}
 
 	return 0;
