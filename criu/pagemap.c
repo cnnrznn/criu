@@ -449,7 +449,7 @@ static int maybe_read_page_img_cache(struct page_read *pr, unsigned long vaddr,
 	return ret;
 }
 
-static int read_page_complete(int pid, unsigned long vaddr, int nr_pages, void *priv)
+int read_page_complete(int pid, unsigned long vaddr, int nr_pages, void *priv)
 {
 	int ret = 0;
 	struct page_read *pr = priv;
@@ -473,7 +473,7 @@ static int maybe_read_page_remote(struct page_read *pr, unsigned long vaddr,
 
     if (opts.pico_restore) {
         ret = pico_get_remote_pages(pr, vaddr, nr, buf);
-        ret = read_page_complete(pr->pid, vaddr, nr, pr);
+        //ret = read_page_complete(pr->pid, vaddr, nr, pr);
     }
 	/* We always do PR_ASAP mode here (FIXME?) */
     else {

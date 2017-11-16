@@ -2,8 +2,8 @@
 #include <netinet/in.h>
 
 #include "log.h"
-#include "migrate.h"
 #include "pico-soft_mig.h"
+#include "pico-man.h"
 
 static long unsigned addrs[SM_ADDR_LIMIT] = { 0 };
 static int counts[SM_ADDR_LIMIT] = { 0 };
@@ -14,7 +14,7 @@ static struct sm_node_t *head = NULL;
 static int num_nodes = 0;
 
 int
-pico_soft_migrate(unsigned int addr)
+pico_soft_migrate(unsigned int addr, int np)
 {
     int i;
 
@@ -34,23 +34,24 @@ pico_soft_migrate(unsigned int addr)
     int addr_index = -1;
     for (i=0; i < addrs_size; i++) {
         if (addrs[i] == head->addr) {
-            counts[i]--;
+            counts[i] -= head->np;
         }
         if (addrs[i] == addr) {
             found_addr = 1;
             addr_index = i;
-            counts[i]++;
+            counts[i] += np;
         }
     }
     if (!found_addr) {
         addrs[addrs_size] = addr;
-        counts[addrs_size] = 1;
+        counts[addrs_size] = np;
         addr_index = addrs_size;
         addrs_size++;
     }
 
     // replace the data at head with current time, addr
     head->addr = addr;
+    head->np = np;
     gettimeofday(&head->time, NULL);
 
     // if count is above threshold, check time diff of head and head->next;
@@ -62,7 +63,7 @@ pico_soft_migrate(unsigned int addr)
             struct in_addr inaddr;
             inaddr.s_addr = addr;
 
-            migrate_ip(inet_ntoa(inaddr));
+            migrate_soft(inet_ntoa(inaddr));
             return 1;
         }
     }

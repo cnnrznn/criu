@@ -9,13 +9,14 @@
 #include "array.h"
 #include "binsearch.h"
 #include "criu-log.h"
-#include "migrate.h"
 #include "page-xfer.h"
 #include "pstree.h"
 #include "quicksort.h"
 #include "rst_info.h"
 #include "util.h"
 #include "vma.h"
+
+#define MIN(a, b) a < b ? a : b;
 
 static page_server *page_servers = NULL;
 static int page_servers_size = 0;
@@ -131,26 +132,26 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     // if page is pinned (must be pinned on different machine), checkpoint and restore on target machine (IPC with criu-chamber?)
     // write to stdout (addr) (criu-chamber will have set this up as pipe
     int ret;
-    struct vma_area *vma;
-    struct vm_area_list *vmas;
-    struct pstree_item *item = pstree_item_by_virt(pr->pid);
-    vmas = &rsti(item)->vmas;
+    //struct vma_area *vma;
+    //struct vm_area_list *vmas;
+    //struct pstree_item *item = pstree_item_by_virt(pr->pid);
+    //vmas = &rsti(item)->vmas;
 
-    list_for_each_entry(vma, &vmas->h, list) {
-        if (vma->e->start <= addr && vma->e->end > addr) {
-            if (vma->e->flags & MAP_PIN) {
-                // call migration library
-                struct in_addr inaddr;
-                inaddr.s_addr = vma->e->pico_addr;
+    //list_for_each_entry(vma, &vmas->h, list) {
+    //    if (vma->e->start <= addr && vma->e->end > addr) {
+    //        if (vma->e->flags & MAP_PIN) {
+    //            // call migration library
+    //            struct in_addr inaddr;
+    //            inaddr.s_addr = vma->e->pico_addr;
 
-                migrate_ip(inet_ntoa(inaddr));
-                goto jail; // do not pass go, do not collect $200
-            }
-            else {
-                break;
-            }
-        }
-    }
+    //            migrate_ip(inet_ntoa(inaddr));
+    //            goto jail; // do not pass go, do not collect $200
+    //        }
+    //        else {
+    //            break;
+    //        }
+    //    }
+    //}
 
     if (page_servers == NULL) {
         page_servers_size = 16;
@@ -162,9 +163,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     ret = pr->seek_pagemap(pr, addr);
     if (!ret)
         return -1;
-
-    if (pico_soft_migrate(pr->pe->addr))
-        goto jail;
 
     if (page_servers_ct == 0) { // fist entry
         page_servers[0].addr = pr->pe->addr;
@@ -197,12 +195,42 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     // request pages from page server
 
+    // compute start of boundary
+#define BLOCK_SIZE 1
+    const unsigned long pico_addr = pr->pe->addr;
+    const unsigned long block = addr - (addr % (BLOCK_SIZE * PAGE_SIZE));
+    const unsigned long blockend = block + (BLOCK_SIZE * PAGE_SIZE);
+    unsigned long start = 0;
+    int nr_pages = 0;
+
+    // find first pagemap entry at start of boundary
+    pr->reset(pr);
+    pr->seek_pagemap(pr, block);
+
+    // skip to first page
+    pr->skip_pages(pr, block > pr->cvaddr ? block - pr->cvaddr : 0);
+
+    // compute number of pages
+    while (pr->pe->vaddr < blockend) {
+        if (pr->pe->addr == pico_addr && pr->pe->flags & PE_LAZY) {
+            if (!start)
+                start = pr->cvaddr;
+            unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
+            nr_pages += (end - pr->cvaddr) / PAGE_SIZE;
+        }
+        if (!pr->advance(pr))
+            break;
+    }
+
 	struct page_server_iov pi = {
 		.cmd		= PS_IOV_GET,
-		.nr_pages	= nr,
-		.vaddr		= addr,
+		.nr_pages	= nr_pages,
+		.vaddr		= start,
 		.dst_id		= pr->pid,
 	};
+
+    if (pico_soft_migrate(pico_addr, nr_pages))
+        goto jail;
 
 	/* We cannot use send_psi here because we have to use MSG_DONTWAIT */
 	if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
@@ -215,12 +243,27 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     // recv page data
     int total_recv = 0;
+    pr->reset(pr);
+    pr->seek_pagemap(pr, start);
+    pr->skip_pages(pr, start > pr->cvaddr ? start - pr->cvaddr : 0);
+
     pr_debug("CONNOR: time before page read\n");
-    while (total_recv < nr * PAGE_SIZE) {
-        int tmp = read(server->sk, buf + total_recv, (nr * PAGE_SIZE) - total_recv);
-        total_recv += tmp;
+    while (pr->pe->vaddr < blockend) {
+        if (pr->pe->addr == pico_addr && pr->pe->flags & PE_LAZY) {
+            unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
+            total_recv = 0;
+            while (total_recv < (end - pr->cvaddr)) {
+                int tmp = read(server->sk, buf + total_recv, (end - pr->cvaddr) - total_recv);
+                total_recv += tmp;
+            }
+            // copy pe into uffdio_copy
+            if (read_page_complete(pr->pid, pr->cvaddr, (end - pr->cvaddr)/PAGE_SIZE, pr))
+                return -1;
+        }
+        if (!pr->advance(pr))
+            break;
     }
-    pr_debug("CONNOR: time after page read\n");
+    pr_debug("CONNOR: time after page read\n\n");
 
     /*pr_debug("CONNOR: pico-restore raw page data (%lu):\n", nr * PAGE_SIZE);
     pr_debug("====================\n");

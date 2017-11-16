@@ -157,4 +157,6 @@ static inline bool pagemap_present(PagemapEntry *pe)
 	return !!(pe->flags & PE_PRESENT);
 }
 
+int read_page_complete(int pid, unsigned long vaddr, int nr_pages, void *priv);
+
 #endif /* __CR_PAGE_READ_H__ */

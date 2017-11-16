@@ -40,7 +40,7 @@
 #include "rst-malloc.h"
 #include "util.h"
 
-#include "migrate.h"
+#include "pico-man.h"
 
 #undef  LOG_PREFIX
 #define LOG_PREFIX "uffd: "
@@ -730,17 +730,18 @@ static int uffd_copy(struct lazy_pages_info *lpi, __u64 address, int nr_pages)
 
 static int complete_page_fault(struct lazy_pages_info *lpi, unsigned long img_addr, int nr)
 {
-	unsigned long addr = 0;
-	struct lp_req *req;
+	//unsigned long addr = 0;
+	unsigned long addr = img_addr;
+	//struct lp_req *req;
 
-	list_for_each_entry(req, &lpi->reqs, l) {
-		if (req->img_addr == img_addr) {
-			addr = req->addr;
-			list_del(&req->l);
-			xfree(req);
-			break;
-		}
-	}
+	//list_for_each_entry(req, &lpi->reqs, l) {
+	//	if (req->img_addr == img_addr) {
+	//		addr = req->addr;
+	//		list_del(&req->l);
+	//		xfree(req);
+	//		break;
+	//	}
+	//}
 
 	/*
 	 * The process may exit while we still have requests in
