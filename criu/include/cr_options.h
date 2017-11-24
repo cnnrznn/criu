@@ -134,6 +134,8 @@ struct cr_options {
     char*           pico_pin_fds;       /* path to file descriptor maintainer UNIXFD */
     int             pico_port;          /* port to use for page-server */
     bool            pico_crash;         /* report critical failures to manager */
+    uint32_t*       pico_dist;          /* list of peers by closest->farthest */
+    int             pico_npeers;        /* number of peers in system */
 };
 
 extern struct cr_options opts;

@@ -15,6 +15,8 @@
 #include "protobuf.h"
 #include "quicksort.h"
 
+#include "pico-util.h"
+
 #define MIN(a, b) a < b ? a : b;
 
 static struct disk_pages **dpgs;
@@ -122,14 +124,12 @@ disk_serve_get_pages(int sk, struct page_server_iov *pi)
     other.pid = pi->dst_id;
     void *buf = malloc(pi->nr_pages * PAGE_SIZE);
     int nr_sent = 0;
-    unsigned long pico_addr;
 
     dps = binsearch(&dpgs_arr, &other, 0, dpgs_index-1);
 
     dps->pr.reset(&dps->pr);
     dps->pr.seek_pagemap(&dps->pr, pi->vaddr);
     dps->pr.skip_pages(&dps->pr, pi->vaddr > dps->pr.cvaddr ? pi->vaddr - dps->pr.cvaddr : 0);
-    pico_addr = dps->pr.pe->addr;
     //dps->pr.skip_pages(&dps->pr, pi->vaddr - dps->pr.pe->vaddr);
 
     //pr_debug("CONNOR: seeked to pagemap 0x%lx\n", dps->pr.cvaddr);
@@ -142,7 +142,8 @@ disk_serve_get_pages(int sk, struct page_server_iov *pi)
         unsigned long start = dps->pr.cvaddr;
         unsigned long end = MIN(dps->pr.pe->vaddr + (dps->pr.pe->nr_pages * PAGE_SIZE),
                                     pi->vaddr + (pi->nr_pages * PAGE_SIZE));
-        if (dps->pr.pe->addr == pico_addr && dps->pr.pe->flags & PE_LAZY) {
+        if (pagemap_contains_addr(dps->pr.pe->n_addrs, dps->pr.pe->addrs, opts.pico_addr.s_addr) &&
+                dps->pr.pe->flags & PE_LAZY) {
             dps->pr.read_pages(&dps->pr, dps->pr.cvaddr, (end - dps->pr.cvaddr)/PAGE_SIZE, buf, 0);
             if (write(sk, buf, (end - start)) != (end - start)) {
                 ret = -1;

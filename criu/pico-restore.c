@@ -5,6 +5,7 @@
 #include "pico-restore.h"
 #include "pico-pin.h"
 #include "pico-soft_mig.h"
+#include "pico-util.h"
 
 #include "array.h"
 #include "binsearch.h"
@@ -15,6 +16,7 @@
 #include "rst_info.h"
 #include "util.h"
 #include "vma.h"
+#include "cr_options.h"
 
 #define MIN(a, b) a < b ? a : b;
 
@@ -153,6 +155,19 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     //    }
     //}
 
+    int i;
+
+    // pick closest server
+    unsigned long pico_addr = 0;
+
+    for (i=0; i < opts.pico_npeers; i++) {
+        if (pagemap_contains_addr(pr->pe->n_addrs, pr->pe->addrs, opts.pico_dist[i])) {
+            pico_addr = opts.pico_dist[i];
+            break;
+        }
+    }
+    pr_debug("CONNOR: closest server is %lu\n", pico_addr);
+
     if (page_servers == NULL) {
         page_servers_size = 16;
         page_servers = malloc(16 * sizeof(page_server));
@@ -165,13 +180,13 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
         return -1;
 
     if (page_servers_ct == 0) { // fist entry
-        page_servers[0].addr = pr->pe->addr;
-        page_servers[0].sk = pico_conn_server(pr->pe->addr, pr->pe->port);
+        page_servers[0].addr = pico_addr;
+        page_servers[0].sk = pico_conn_server(pico_addr, pr->pe->port);
         page_servers_arr.elems[0] = (void*) &page_servers[0];
         page_servers_ct++;
     }
 
-    page_server tmp = { .sk = 0, .addr = pr->pe->addr };
+    page_server tmp = { .sk = 0, .addr = pico_addr };
     page_server *server = binsearch(&page_servers_arr, &tmp, 0, page_servers_ct-1);
 
     if (server == NULL) {   // not found; connect
@@ -184,8 +199,8 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
             page_servers_size * sizeof(void*));
         }
 
-        page_servers[page_servers_ct].addr = pr->pe->addr;
-        page_servers[page_servers_ct].sk = pico_conn_server(pr->pe->addr, pr->pe->port);
+        page_servers[page_servers_ct].addr = pico_addr;
+        page_servers[page_servers_ct].sk = pico_conn_server(pico_addr, pr->pe->port);
         page_servers_arr.elems[page_servers_ct] = (void*) &page_servers[page_servers_ct];
         server = &page_servers[page_servers_ct];
         page_servers_ct++;
@@ -197,7 +212,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     // compute start of boundary
 #define BLOCK_SIZE 1
-    const unsigned long pico_addr = pr->pe->addr;
     const unsigned long block = addr - (addr % (BLOCK_SIZE * PAGE_SIZE));
     const unsigned long blockend = block + (BLOCK_SIZE * PAGE_SIZE);
     unsigned long start = 0;
@@ -212,7 +226,8 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     // compute number of pages
     while (pr->pe->vaddr < blockend) {
-        if (pr->pe->addr == pico_addr && pr->pe->flags & PE_LAZY) {
+        if (pagemap_contains_addr(pr->pe->n_addrs, pr->pe->addrs, pico_addr) &&
+                pr->pe->flags & PE_LAZY) {
             if (!start)
                 start = pr->cvaddr;
             unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
@@ -229,8 +244,8 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 		.dst_id		= pr->pid,
 	};
 
-    if (pico_soft_migrate(pico_addr, nr_pages))
-        goto jail;
+    //if (pico_soft_migrate(pico_addr, nr_pages))
+    //    goto jail;
 
 	/* We cannot use send_psi here because we have to use MSG_DONTWAIT */
 	if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
@@ -249,7 +264,8 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     pr_debug("CONNOR: time before page read\n");
     while (pr->pe->vaddr < blockend) {
-        if (pr->pe->addr == pico_addr && pr->pe->flags & PE_LAZY) {
+        if (pagemap_contains_addr(pr->pe->n_addrs, pr->pe->addrs, pico_addr) &&
+                pr->pe->flags & PE_LAZY) {
             unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
             total_recv = 0;
             while (total_recv < (end - pr->cvaddr)) {
@@ -273,6 +289,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
         pr_debug("CONNOR: foo\n");
     pr_debug("\n====================\n\n");*/
 
-jail:
+//jail:
     return 0;
 }

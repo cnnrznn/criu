@@ -1,9 +1,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "pico-cache.h"
+#include "pico-util.h"
 
 #include "cr_options.h"
 #include "page-xfer.h"
@@ -42,8 +44,9 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
     struct vma_area *vma = NULL;
     int dfd = -1;
     long version = 0;
-    const uint32_t maddr = opts.pico_addr.s_addr;
-    uint32_t addr = maddr;
+    uint32_t maddr = opts.pico_addr.s_addr;
+    int naddrs = 1;
+    uint32_t *addrs = &maddr;
     const uint32_t mport = opts.pico_port;
     uint32_t port = mport;
 
@@ -92,6 +95,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                 When new, verion#=0, addr and port are current interface
                 */
                 void *end;
+                char free_addrs = 0;
 
                 //pr_debug("CONNOR: dumping cached pagemaps\n");
 
@@ -119,7 +123,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
 
                         // dump pagemap entry
                         //pr_debug("CONNOR: writing pagemap 0x%lx - 0x%lx\n", (long unsigned)vmaiov.iov_base, (long unsigned)vmaiov.iov_base + vmaiov.iov_len);
-                        xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version, pr.pe->addr, pr.pe->port);
+                        xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version, pr.pe->n_addrs, pr.pe->addrs, pr.pe->port);
 
                         if ((void*)vma->e->end > tmpiov.iov_base + tmpiov.iov_len) {
                             vmaiov.iov_base = tmpiov.iov_base + tmpiov.iov_len;
@@ -149,7 +153,8 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                     if (tmpiov.iov_base < (void*)pr.cvaddr) {   // only in new
                         end = MIN(iov.iov_base + iov.iov_len, (void*)pr.cvaddr);
                         version = 0;
-                        addr = maddr;
+                        naddrs = 1;
+                        addrs = &maddr;
                         port = mport;
                     }
                     else {                                      // overlap
@@ -157,11 +162,24 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                         version = pr.pe->version;
                         if (ppb->flags & PPB_DIRTY) {
                             version++;
-                            addr = maddr;
+                            naddrs = 1;
+                            addrs = &maddr;
                             port = mport;
                         }
+                        else if (!pagemap_contains_addr(pr.pe->n_addrs, pr.pe->addrs, maddr)) {
+                            addrs = malloc((pr.pe->n_addrs + 1) * sizeof(uint32_t));
+                            int i;
+                            for (i=0; i<pr.pe->n_addrs; i++)
+                                addrs[i+1] = pr.pe->addrs[i];
+                            addrs[0] = maddr;
+                            naddrs = pr.pe->n_addrs + 1;
+                            port = pr.pe->port;
+
+                            free_addrs = 1;
+                        }
                         else {
-                            addr = pr.pe->addr;
+                            addrs = pr.pe->addrs;
+                            naddrs = pr.pe->n_addrs;
                             port = pr.pe->port;
                         }
 
@@ -181,7 +199,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                     if (ppb->flags & PPB_LAZY && !dump_lazy) {
                         flags = PE_LAZY;
                         //pr_debug("CONNOR: writing pagemap 0x%lx - 0x%lx\n", (long unsigned)tmpiov.iov_base, (long unsigned)tmpiov.iov_base + tmpiov.iov_len);
-                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port)) {
+                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, naddrs, addrs, port)) {
                             return -1;
                         }
                     }
@@ -190,11 +208,16 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                     }
                     if (flags != PE_LAZY) {
                         //pr_debug("CONNOR: writing pagemap 0x%lx - 0x%lx\n", (long unsigned)tmpiov.iov_base, (long unsigned)tmpiov.iov_base + tmpiov.iov_len);
-                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, addr, port)) {
+                        if (xfer->write_pagemap(xfer, &tmpiov, flags, version, naddrs, addrs, port)) {
                             return -1;
                         }
                         if (xfer->write_pages(xfer, ppb->p[0], tmpiov.iov_len))
                             return -1;
+                    }
+
+                    if (free_addrs) {
+                        free(addrs);
+                        free_addrs = 0;
                     }
 
                     size_dumped += tmpiov.iov_len;
@@ -204,7 +227,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
             else {
                 if (ppb->flags & PPB_LAZY) {
                     if (!dump_lazy) {
-                        if (xfer->write_pagemap(xfer, &iov, PE_LAZY, version, addr, port))
+                        if (xfer->write_pagemap(xfer, &iov, PE_LAZY, version, naddrs, addrs, port))
                             return -1;
                         continue;
                     } else {
@@ -212,7 +235,7 @@ pico_page_xfer_dump_pages(struct page_xfer *xfer, struct page_pipe *pp,
                     }
                 }
 
-                if (xfer->write_pagemap(xfer, &iov, flags, version, addr, port))
+                if (xfer->write_pagemap(xfer, &iov, flags, version, naddrs, addrs, port))
                     return -1;
                 if (xfer->write_pages(xfer, ppb->p[0], iov.iov_len))
                     return -1;
@@ -259,7 +282,7 @@ pico_dump_end_cached_pagemaps(struct page_xfer *xfer)
 
             // dump pagemap entry
             xfer->write_pagemap(xfer, &vmaiov, pr.pe->flags, pr.pe->version,
-            pr.pe->addr, pr.pe->port);
+                pr.pe->n_addrs, pr.pe->addrs, pr.pe->port);
 
             if ((void*)vma->e->end <= ciov.iov_base + ciov.iov_len) {
                 vma = list_entry(vma->list.next, typeof(*vma), list);

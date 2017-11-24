@@ -58,6 +58,8 @@
 
 #include "../soccr/soccr.h"
 
+#include "pico-util.h"
+
 struct cr_options opts;
 char **global_conf = NULL;
 char **user_conf = NULL;
@@ -504,6 +506,8 @@ int main(int argc, char *argv[], char *envp[])
         { "pico-pin-fds",       required_argument,  0, 2005},
         { "pico-port",          required_argument,  0, 2006},
         { "pico-crash",         no_argument,        0, 2007},
+        { "pico-dist",          required_argument,  0, 2008},
+        { "pico-npeers",        required_argument,  0, 2009},
 
 		{ },
 	};
@@ -854,6 +858,12 @@ int main(int argc, char *argv[], char *envp[])
             break;
         case 2007:
             opts.pico_crash = true;
+            break;
+        case 2008:
+            opts.pico_dist = parse_pico_dist(optarg);
+            break;
+        case 2009:
+            opts.pico_npeers = atoi(optarg);
             break;
 		case 1089:
 			break;

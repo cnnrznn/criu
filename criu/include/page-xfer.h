@@ -42,7 +42,7 @@ extern int cr_page_server(bool daemon_mode, bool lazy_dump, int cfd);
 
 struct page_xfer {
 	/* transfers one vaddr:len entry */
-	int (*write_pagemap)(struct page_xfer *self, struct iovec *iov, u32 flags, uint64_t version, unsigned addr, unsigned port);
+	int (*write_pagemap)(struct page_xfer *self, struct iovec *iov, u32 flags, uint64_t version, int naddrs, uint32_t *addrs, unsigned port);
 	/* transfers pages related to previous pagemap */
 	int (*write_pages)(struct page_xfer *self, int pipe, unsigned long len);
 	void (*close)(struct page_xfer *self);
