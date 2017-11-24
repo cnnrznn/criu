@@ -157,17 +157,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     int i;
 
-    // pick closest server
-    unsigned long pico_addr = 0;
-
-    for (i=0; i < opts.pico_npeers; i++) {
-        if (pagemap_contains_addr(pr->pe->n_addrs, pr->pe->addrs, opts.pico_dist[i])) {
-            pico_addr = opts.pico_dist[i];
-            break;
-        }
-    }
-    pr_debug("CONNOR: closest server is %lu\n", pico_addr);
-
     if (page_servers == NULL) {
         page_servers_size = 16;
         page_servers = malloc(16 * sizeof(page_server));
@@ -178,6 +167,17 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     ret = pr->seek_pagemap(pr, addr);
     if (!ret)
         return -1;
+
+    // pick closest server
+    unsigned long pico_addr = 0;
+
+    for (i=0; i < opts.pico_npeers; i++) {
+        if (pagemap_contains_addr(pr->pe->n_addrs, pr->pe->addrs, opts.pico_dist[i])) {
+            pico_addr = opts.pico_dist[i];
+            break;
+        }
+    }
+    pr_debug("CONNOR: closest server is %lu\n", pico_addr);
 
     if (page_servers_ct == 0) { // fist entry
         page_servers[0].addr = pico_addr;

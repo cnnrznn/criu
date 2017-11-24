@@ -9,7 +9,7 @@ uint32_t *
 parse_pico_dist(char *s)
 {
     int i,j;
-    int pos = -1;
+    int pos = 0;
     uint32_t *list = malloc(opts.pico_npeers * sizeof(uint32_t));
 
     for (i=0; i < opts.pico_npeers; i++) {
@@ -27,8 +27,6 @@ parse_pico_dist(char *s)
 
         inet_aton(ip, &tmp);
         list[i] = tmp.s_addr;
-
-        pr_debug("CONNOR: dist - %d\n", list[i]);
     }
 
     return list;
