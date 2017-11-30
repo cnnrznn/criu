@@ -98,6 +98,7 @@ obj-y           += pico-sk_inet.o
 obj-y           += pico-soft_mig.o
 obj-y           += pico-man.o
 obj-y           += pico-util.o
+obj-y           += pico-regfile.o
 
 ifeq ($(VDSO),y)
 obj-y			+= pie-util-vdso.o

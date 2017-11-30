@@ -52,6 +52,119 @@ struct fdtype_ops pico_inet_dump_ops = {
     .dump       = pico_dump_one_inet_fd,
 };
 
+int
+pico_send_fd(int fd, int lfd)
+{
+    int ret = 0;
+
+    // send file descriptor to sk-holder
+    int rsk = socket(AF_UNIX, SOCK_STREAM, 0);
+    struct sockaddr_un rskaddr = { 0 };
+    rskaddr.sun_family = AF_UNIX;
+    strcpy(rskaddr.sun_path, opts.pico_pin_fds);
+
+    if (connect(rsk, (struct sockaddr *)&rskaddr, sizeof(rskaddr))) {
+        ret = -1;
+        pr_err("connect");
+        goto err_conn;
+    }
+
+    struct msghdr msg = { 0 };
+    struct cmsghdr *cmptr = malloc(CMSG_LEN(sizeof(int)));
+    memset(cmptr, 0, CMSG_LEN(sizeof(int)));
+    int buf[2] = { 0 };
+    struct iovec iov[1];
+
+    iov[0].iov_base = buf;
+    iov[0].iov_len = sizeof(buf);
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_control = cmptr;
+    msg.msg_controllen = CMSG_LEN(sizeof(int));
+    cmptr->cmsg_level = SOL_SOCKET;
+    cmptr->cmsg_type  = SCM_RIGHTS;
+    cmptr->cmsg_len   = CMSG_LEN(sizeof(int));
+    *(int*)CMSG_DATA(cmptr) = lfd;
+    buf[0] = CONTAINS_SK;
+    buf[1] = fd;
+
+    pr_debug("CONNOR: sending fd %d to manager\n", fd);
+
+    if (sendmsg(rsk, &msg, 0) < 0) {
+        pr_err("sendmsg");
+        ret = -1;
+        goto err_send;
+    }
+
+err_send:
+    free(cmptr);
+err_conn:
+    close(rsk);
+
+    return ret;
+}
+
+int
+pico_rtrv_fd(int fd, int *new_fd)
+{
+    int ret = 0;
+    *new_fd = -1;
+
+    // recv file descriptor from sk-holder
+    int rsk = socket(AF_UNIX, SOCK_STREAM, 0);
+    struct sockaddr_un rskaddr = { 0 };
+    rskaddr.sun_family = AF_UNIX;
+    strcpy(rskaddr.sun_path, opts.pico_pin_fds);
+
+    if (connect(rsk, (struct sockaddr *)&rskaddr, sizeof(rskaddr))) {
+        ret = -1;
+        pr_err("connect");
+        goto err_conn;
+    }
+
+    struct msghdr msg = { 0 };
+    struct cmsghdr *cmptr = malloc(CMSG_LEN(sizeof(int)));
+    int buf[2] = { 0 };
+    struct iovec iov[1];
+
+    iov[0].iov_base = buf;
+    iov[0].iov_len = sizeof(buf);
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_control = cmptr;
+    msg.msg_controllen = 0;
+    buf[0] = REQUEST_SK;
+    buf[1] = fd;
+    if (sendmsg(rsk, &msg, 0) < 0) {
+        ret = -1;
+        pr_perror("sendmsg");
+        goto err;
+    }
+
+    msg.msg_controllen = CMSG_LEN(sizeof(int));
+
+    if (recvmsg(rsk, &msg, 0) < 0) {
+        ret = -1;
+        pr_err("recvmsg");
+        goto err;
+    }
+
+    *new_fd = *(int*)CMSG_DATA(cmptr);
+
+    pr_debug("CONNOR: retrieved fd (%d, %d)\n", fd, *new_fd);
+
+err:
+    free(cmptr);
+err_conn:
+    close(rsk);
+
+    return ret;
+}
+
 static char
 comp_dumped_id(void *a, void *b)
 {
@@ -176,49 +289,7 @@ pico_do_dump_one_inet_fd(int lfd, u32 id, const struct fd_parms *p, int family)
 	if (pb_write_one(img_from_set(glob_imgset, CR_FD_FILES), &fe, PB_FILE))
 		goto err;
 
-    // send file descriptor to sk-holder
-    int rsk = socket(AF_UNIX, SOCK_STREAM, 0);
-    struct sockaddr_un rskaddr = { 0 };
-    rskaddr.sun_family = AF_UNIX;
-    strcpy(rskaddr.sun_path, opts.pico_pin_fds);
-
-    if (connect(rsk, (struct sockaddr *)&rskaddr, sizeof(rskaddr))) {
-        pr_err("connect");
-        goto connerr;
-    }
-
-    struct msghdr msg = { 0 };
-    struct cmsghdr *cmptr = malloc(CMSG_LEN(sizeof(int)));
-    memset(cmptr, 0, CMSG_LEN(sizeof(int)));
-    int buf[2] = { 0 };
-    struct iovec iov[1];
-
-    iov[0].iov_base = buf;
-    iov[0].iov_len = sizeof(buf);
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-    msg.msg_name = NULL;
-    msg.msg_namelen = 0;
-    msg.msg_control = cmptr;
-    msg.msg_controllen = CMSG_LEN(sizeof(int));
-    cmptr->cmsg_level = SOL_SOCKET;
-    cmptr->cmsg_type  = SCM_RIGHTS;
-    cmptr->cmsg_len   = CMSG_LEN(sizeof(int));
-    *(int*)CMSG_DATA(cmptr) = lfd;
-    buf[0] = CONTAINS_SK;
-    buf[1] = p->fd;
-
-    if (sendmsg(rsk, &msg, 0) < 0) {
-        pr_err("sendmsg");
-        goto senderr;
-    }
-
-    err = 0;
-
-senderr:
-    free(cmptr);
-connerr:
-    close(rsk);
+    err = pico_send_fd(p->fd, lfd);
 
 err:
     release_skopts(&skopts);
@@ -242,54 +313,9 @@ pico_open_inet_sk(struct file_desc *d, int *new_fd)
 	if (fle->stage >= FLE_OPEN)
 		return pico_post_open_inet_sk(d, fle->fe->fd);
 
-    // recv file descriptor from sk-holder
-    int rsk = socket(AF_UNIX, SOCK_STREAM, 0);
-    struct sockaddr_un rskaddr = { 0 };
-    rskaddr.sun_family = AF_UNIX;
-    strcpy(rskaddr.sun_path, opts.pico_pin_fds);
+    pico_rtrv_fd(file_master(d)->fe->fd, &ret);
 
-    if (connect(rsk, (struct sockaddr *)&rskaddr, sizeof(rskaddr))) {
-        pr_err("connect");
-        goto connerr;
-    }
-
-    struct msghdr msg = { 0 };
-    struct cmsghdr *cmptr = malloc(CMSG_LEN(sizeof(int)));
-    int buf[2] = { 0 };
-    struct iovec iov[1];
-
-    iov[0].iov_base = buf;
-    iov[0].iov_len = sizeof(buf);
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-    msg.msg_name = NULL;
-    msg.msg_namelen = 0;
-    msg.msg_control = cmptr;
-    msg.msg_controllen = 0;
-    buf[0] = REQUEST_SK;
-    buf[1] = file_master(d)->fe->fd;
-    pr_debug("Requesting fd %d\n", buf[1]);
-
-    if (sendmsg(rsk, &msg, 0) < 0) {
-        pr_perror("sendmsg");
-        goto err;
-    }
-
-    msg.msg_controllen = CMSG_LEN(sizeof(int));
-
-    if (recvmsg(rsk, &msg, 0) < 0) {
-        pr_err("recvmsg");
-        goto err;
-    }
-
-    ret = *(int*)CMSG_DATA(cmptr);
     pr_debug("CONNOR: (criufd, procfd) = (%d, %d)\n", ret, file_master(d)->fe->fd);
-    pr_debug("CONNOR: CMSG_LEN = %lu\n", msg.msg_controllen);
-
-err:
-    free(cmptr);
-connerr:
-    close(rsk);
 
     *new_fd = ret;
 

@@ -19,4 +19,8 @@ extern char comp_FileEntry(void*, void*);
 extern struct file_desc_ops pico_inet_desc_ops;
 extern struct fdtype_ops pico_inet_dump_ops;
 
+extern int pico_send_fd(int fd, int lfd);
+
+extern int pico_rtrv_fd(int fd, int *new_fd);
+
 #endif /* _PF_INET_SK_H */

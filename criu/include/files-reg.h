@@ -56,4 +56,9 @@ extern int strip_deleted(struct fd_link *link);
 
 extern int dead_pid_conflict(void);
 
+extern int check_path_remap(struct fd_link *link, const struct fd_parms *parms,
+				int lfd, u32 id, struct ns_id *nsid);
+
+extern bool should_check_size(int flags);
+
 #endif /* __CR_FILES_REG_H__ */

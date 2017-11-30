@@ -53,6 +53,7 @@
 #include "plugin.h"
 
 #include "pico-sk_inet.h"
+#include "pico-regfile.h"
 
 #define FDESC_HASH_SIZE	64
 static struct hlist_head file_desc_hash[FDESC_HASH_SIZE];
@@ -458,14 +459,14 @@ static int dump_chrdev(struct fd_parms *p, int lfd, struct cr_img *img)
 	return do_dump_gen_file(p, lfd, ops, img);
 }
 
-static int dump_one_file(struct pid *pid, int fd, int lfd, struct fd_opts *opts,
+static int dump_one_file(struct pid *pid, int fd, int lfd, struct fd_opts *fdopts,
 		       struct cr_img *img, struct parasite_ctl *ctl)
 {
 	struct fd_parms p = FD_PARMS_INIT;
 	const struct fdtype_ops *ops;
 	struct fd_link link;
 
-	if (fill_fd_params(pid, fd, lfd, opts, &p) < 0) {
+	if (fill_fd_params(pid, fd, lfd, fdopts, &p) < 0) {
 		pr_err("Can't get stat on %d\n", fd);
 		return -1;
 	}
@@ -510,8 +511,11 @@ static int dump_one_file(struct pid *pid, int fd, int lfd, struct fd_opts *opts,
 			return -1;
 
 		p.link = &link;
-		if (link.name[1] == '/')
+		if (link.name[1] == '/') {
+            if (opts.pico_pin_fds)
+                return do_dump_gen_file(&p, lfd, &pico_regfile_dump_ops, img);
 			return do_dump_gen_file(&p, lfd, &regfile_dump_ops, img);
+        }
 
 		if (check_ns_proc(&link))
 			return do_dump_gen_file(&p, lfd, &nsfile_dump_ops, img);

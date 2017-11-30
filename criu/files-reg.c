@@ -44,6 +44,8 @@
 #include "files-reg.h"
 #include "plugin.h"
 
+#include "pico-regfile.h"
+
 int setfsuid(uid_t fsuid);
 int setfsgid(gid_t fsuid);
 
@@ -1131,7 +1133,7 @@ int strip_deleted(struct fd_link *link)
 	return 0;
 }
 
-static int check_path_remap(struct fd_link *link, const struct fd_parms *parms,
+int check_path_remap(struct fd_link *link, const struct fd_parms *parms,
 				int lfd, u32 id, struct ns_id *nsid)
 {
 	char *rpath = link->name;
@@ -1277,7 +1279,7 @@ static int check_path_remap(struct fd_link *link, const struct fd_parms *parms,
 	return 0;
 }
 
-static bool should_check_size(int flags)
+bool should_check_size(int flags)
 {
 	/* Skip size if file has O_APPEND and O_WRONLY flags (e.g. log file). */
 	if (((flags & O_ACCMODE) == O_WRONLY) &&
@@ -1976,6 +1978,9 @@ static int collect_one_regfile(void *o, ProtobufCMessage *base, struct cr_img *i
 		rfi->path = rfi->rfe->name + 1;
 	rfi->remap = NULL;
 	rfi->size_mode_checked = false;
+
+    if (opts.pico_pin_fds)
+        reg_desc_ops.open = pico_open_regfile;
 
 	pr_info("Collected [%s] ID %#x\n", rfi->path, rfi->rfe->id);
 	return file_desc_add(&rfi->d, rfi->rfe->id, &reg_desc_ops);
