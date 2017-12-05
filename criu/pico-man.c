@@ -5,10 +5,13 @@
 #include <unistd.h>
 
 #include "pico-man.h"
+#include "pico-page_list.h"
+
+#define PICOMAN_ADDR "/tmp/pico"
 
 #define CRASH           "\x0A"
-#define MIGRATE_SOFT    "\x0C"
-#define PICOMAN_ADDR "/tmp/pico"
+#define REMOTE_PAGES    "\x0E"
+#define MIGRATE_SOFT    "\xFF"
 
 static int
 open_comm_sock()
@@ -41,6 +44,34 @@ pico_crash(void)
 
     if (write(sk, CRASH, 1) != 1)
         exit(1);
+
+    close(sk);
+}
+
+void
+pico_remote_pages(struct pico_page_list *pl, int n)
+{
+    int sk = open_comm_sock();
+    struct pico_page_list *p, *tmp;
+
+    if (write(sk, REMOTE_PAGES, 1) != 1)
+        exit(1);
+
+    if (write(sk, &n, 4) != 4)
+        exit(1);
+
+    p = pl;
+    while (p != NULL) {
+        if (write(sk, &p->addr, 8) != 8)
+            exit(1);
+        if (write(sk, &p->size, 8) != 8)
+            exit(1);
+
+        tmp = p;
+        p = p->next;
+
+        free(tmp);
+    }
 
     close(sk);
 }

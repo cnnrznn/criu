@@ -1,8 +1,13 @@
 #ifndef _PJ_PICO_MAN_H
 #define _PJ_PICO_MAN_H
 
+#include "pico-page_list.h"
+
 void
 pico_crash(void);
+
+void
+pico_remote_pages(struct pico_page_list *pl, int n);
 
 void
 migrate_soft(const char ip[15]);

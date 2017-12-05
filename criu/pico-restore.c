@@ -6,6 +6,8 @@
 #include "pico-pin.h"
 #include "pico-soft_mig.h"
 #include "pico-util.h"
+#include "pico-man.h"
+#include "pico-page_list.h"
 
 #include "array.h"
 #include "binsearch.h"
@@ -210,6 +212,9 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     // request pages from page server
 
+    struct pico_page_list *plhead = NULL;
+    int plist_count = 0;
+
     // compute start of boundary
 #define BLOCK_SIZE 1
     const unsigned long block = addr - (addr % (BLOCK_SIZE * PAGE_SIZE));
@@ -232,10 +237,19 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
                 start = pr->cvaddr;
             unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
             nr_pages += (end - pr->cvaddr) / PAGE_SIZE;
+
+            struct pico_page_list *pl = malloc(sizeof(struct pico_page_list));
+            pl->next = plhead;
+            pl->addr = pr->cvaddr;
+            pl->size = end - pr->cvaddr;
+            plhead = pl;
+            plist_count++;
         }
         if (!pr->advance(pr))
             break;
     }
+
+    pico_remote_pages(plhead, plist_count);
 
 	struct page_server_iov pi = {
 		.cmd		= PS_IOV_GET,
