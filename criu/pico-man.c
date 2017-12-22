@@ -53,6 +53,7 @@ pico_remote_pages(struct pico_page_list *pl, int n)
 {
     int sk = open_comm_sock();
     struct pico_page_list *p, *tmp;
+    char dummy;
 
     if (write(sk, REMOTE_PAGES, 1) != 1)
         exit(1);
@@ -72,6 +73,8 @@ pico_remote_pages(struct pico_page_list *pl, int n)
 
         free(tmp);
     }
+
+    read(sk, &dummy, 1); //block in case of migration
 
     close(sk);
 }
