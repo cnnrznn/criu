@@ -7,7 +7,7 @@
 #include "pico-man.h"
 #include "pico-page_list.h"
 
-#define PICOMAN_ADDR "/tmp/picoc"
+#define PICOMAN_ADDR "/tmp/pico"
 
 #define CRASH           "\x0A"
 #define REMOTE_PAGES    "\x0E"
