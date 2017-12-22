@@ -308,6 +308,8 @@ int do_dump_gen_file(struct fd_parms *p, int lfd,
 	ret = fd_id_generate(p->pid, &e, p);
 	if (ret == 1) /* new ID generated */
 		ret = ops->dump(lfd, e.id, p);
+    else if (!ret && opts.pico_pin_fds)
+        pico_send_fd(p->fd, lfd);
 
 	if (ret < 0)
 		return ret;
