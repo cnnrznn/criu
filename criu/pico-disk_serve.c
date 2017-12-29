@@ -141,7 +141,7 @@ disk_serve_get_pages(int sk, struct page_server_iov *pi)
     while (nr_sent < pi->nr_pages) {
         unsigned long start = dps->pr.cvaddr;
         unsigned long end = MIN(dps->pr.pe->vaddr + (dps->pr.pe->nr_pages * PAGE_SIZE),
-                                    pi->vaddr + (pi->nr_pages * PAGE_SIZE));
+                                    dps->pr.cvaddr + ((pi->nr_pages - nr_sent) * PAGE_SIZE));
         if (pagemap_contains_addr(dps->pr.pe->n_addrs, dps->pr.pe->addrs, opts.pico_addr.s_addr) &&
                 dps->pr.pe->flags & PE_LAZY) {
             dps->pr.read_pages(&dps->pr, dps->pr.cvaddr, (end - dps->pr.cvaddr)/PAGE_SIZE, buf, 0);
