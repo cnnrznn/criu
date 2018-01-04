@@ -22,6 +22,8 @@
 
 #define MIN(a, b) a < b ? a : b;
 
+void *pico_uffd_buf = NULL;
+
 static page_server *page_servers = NULL;
 static int page_servers_size = 0;
 static int page_servers_ct = 0;
@@ -159,6 +161,9 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     int i;
 
+    if (!pico_uffd_buf)
+	    posix_memalign(&pico_uffd_buf, PAGE_SIZE, 1024 * getpagesize());
+
     if (page_servers == NULL) {
         page_servers_size = 16;
         page_servers = malloc(16 * sizeof(page_server));
@@ -216,7 +221,7 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     int plist_count = 0;
 
     // compute start of boundary
-#define BLOCK_SIZE 1
+#define BLOCK_SIZE 64
     const unsigned long block = addr - (addr % (BLOCK_SIZE * PAGE_SIZE));
     const unsigned long blockend = block + (BLOCK_SIZE * PAGE_SIZE);
     unsigned long start = 0;
@@ -283,7 +288,7 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
             unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
             total_recv = 0;
             while (total_recv < (end - pr->cvaddr)) {
-                int tmp = read(server->sk, buf + total_recv, (end - pr->cvaddr) - total_recv);
+                int tmp = read(server->sk, pico_uffd_buf + total_recv, (end - pr->cvaddr) - total_recv);
                 total_recv += tmp;
             }
             // copy pe into uffdio_copy

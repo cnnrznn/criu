@@ -8,6 +8,8 @@ typedef struct page_server_t {
     int sk;
 } page_server;
 
+extern void *pico_uffd_buf;
+
 extern int
 pico_get_remote_pages(struct page_read *, long unsigned, int, void *);
 

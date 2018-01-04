@@ -41,6 +41,7 @@
 #include "util.h"
 
 #include "pico-man.h"
+#include "pico-restore.h"
 
 #undef  LOG_PREFIX
 #define LOG_PREFIX "uffd: "
@@ -701,7 +702,12 @@ static int uffd_copy(struct lazy_pages_info *lpi, __u64 address, int nr_pages)
 	int rc;
 
 	uffdio_copy.dst = address;
-	uffdio_copy.src = (unsigned long)lpi->buf;
+    if (opts.pico_restore) {
+        uffdio_copy.src = (unsigned long)pico_uffd_buf;
+    }
+    else {
+        uffdio_copy.src = (unsigned long)lpi->buf;
+    }
 	uffdio_copy.len = len;
 	uffdio_copy.mode = 0;
 	uffdio_copy.copy = 0;
