@@ -254,7 +254,7 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
             break;
     }
 
-    pico_remote_pages(plhead, plist_count);
+    pico_remote_pages(server->addr, plhead, plist_count);
 
 	struct page_server_iov pi = {
 		.cmd		= PS_IOV_GET,

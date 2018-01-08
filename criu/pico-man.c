@@ -49,13 +49,16 @@ pico_crash(void)
 }
 
 void
-pico_remote_pages(struct pico_page_list *pl, int n)
+pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n)
 {
     int sk = open_comm_sock();
     struct pico_page_list *p, *tmp;
     char dummy;
 
     if (write(sk, REMOTE_PAGES, 1) != 1)
+        exit(1);
+
+    if (write(sk, &addr, 4) != 4)
         exit(1);
 
     if (write(sk, &n, 4) != 4)

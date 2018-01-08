@@ -3,11 +3,13 @@
 
 #include "pico-page_list.h"
 
+#include "int.h"
+
 void
 pico_crash(void);
 
 void
-pico_remote_pages(struct pico_page_list *pl, int n);
+pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n);
 
 void
 migrate_soft(const char ip[15]);
