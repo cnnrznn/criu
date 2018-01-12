@@ -161,9 +161,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     int i;
 
-    if (!pico_uffd_buf)
-	    posix_memalign(&pico_uffd_buf, PAGE_SIZE, 1024 * getpagesize());
-
     if (page_servers == NULL) {
         page_servers_size = 16;
         page_servers = malloc(16 * sizeof(page_server));

@@ -42,6 +42,7 @@
 
 #include "pico-man.h"
 #include "pico-restore.h"
+#include "pico-min.h"
 
 #undef  LOG_PREFIX
 #define LOG_PREFIX "uffd: "
@@ -103,6 +104,7 @@ static LIST_HEAD(pending_lpis);
 static int epollfd;
 
 static int handle_uffd_event(struct epoll_rfd *lpfd);
+static int uffd_copy(struct lazy_pages_info *lpi, __u64 address, int nr_pages);
 
 static struct lazy_pages_info *lpi_init(void)
 {
@@ -638,6 +640,9 @@ static int ud_open(int client, struct lazy_pages_info **_lpi)
 	}
 	pr_debug("Received PID: %d, uffd: %d\n", lpi->pid, lpi->lpfd.fd);
 
+    // give the restorer blob some time to time to register mappings with userfaultfd
+    usleep(1000);
+
 	if (opts.use_page_server || opts.pico_restore)
 		pr_flags |= PR_REMOTE;
 	ret = open_page_read(lpi->pid, &lpi->pr, pr_flags);
@@ -659,15 +664,67 @@ static int ud_open(int client, struct lazy_pages_info **_lpi)
 
 	lp_debug(lpi, "Found %ld pages to be handled by UFFD\n", lpi->total_pages);
 
-    if (opts.pico_restore) {
-        if (prepare_files()) {
-            goto out;
+    if (opts.pico_cache) {
+        struct page_read cpr;
+        unsigned long pe_start, pe_end;
+
+        lpi->pr.reset(&lpi->pr);
+
+        // read vmas into dummy tree
+        //struct pstree_item *item = pstree_item_by_virt(lpi->pid);
+        //if (prepare_mm_pid(item)) {
+        //    goto out;
+        //}
+
+        // open cache page read
+        int dfd = open(opts.pico_cache, O_RDONLY);
+        ret = open_page_read_at(dfd, lpi->pid, &cpr, PR_TASK);
+        if(ret <= 0)
+            return -1;
+        close(dfd);
+
+        while (1) {
+            // scan to next pagemap
+            ret = lpi->pr.advance(&lpi->pr);
+            if (ret <= 0)
+                break;
+
+            pe_start = lpi->pr.pe->vaddr;
+            pe_end = pe_start + (lpi->pr.pe->nr_pages * PAGE_SIZE);
+
+            cpr.seek_pagemap(&cpr, pe_start);
+            if (cpr.cvaddr < pe_start)
+                cpr.skip_pages(&cpr, pe_start - cpr.cvaddr);
+
+            while (cpr.cvaddr < pe_end) {
+                unsigned long end;
+                // 1. find end
+                end = MIN(cpr.pe->vaddr + (cpr.pe->nr_pages * PAGE_SIZE),
+                            pe_end);
+
+                // 2. is version # the same
+                if (cpr.pe->flags & PE_PRESENT && lpi->pr.pe->flags == PE_LAZY &&
+                        cpr.pe->version == lpi->pr.pe->version) {
+                    // 3. then read, uffd_copy
+                    unsigned long read_start = cpr.cvaddr;
+                    int ret = cpr.read_pages(&cpr, cpr.cvaddr, (end - cpr.cvaddr) / PAGE_SIZE,
+                                                pico_uffd_buf, 0);
+                    if (ret < 0) {
+                        pr_err("CONNOR: error reading pages from cache\n");
+                        exit(1);
+                    }
+
+                    uffd_copy(lpi, read_start, (end - read_start) / PAGE_SIZE);
+                }
+                else {
+                    // 4. else skip_pages
+                    cpr.skip_pages(&cpr, end - cpr.cvaddr);
+                }
+            }
         }
 
-        struct pstree_item *item = pstree_item_by_virt(lpi->pid);
-        if (prepare_mm_pid(item)) {
-            goto out;
-        }
+        // close cpr
+        cpr.close(&cpr);
     }
 
 	list_add_tail(&lpi->l, &lpis);
@@ -1195,6 +1252,9 @@ int cr_lazy_pages(bool daemon)
 	int nr_fds;
 	int lazy_sk;
 	int ret;
+
+    if (opts.pico_restore)
+	    posix_memalign(&pico_uffd_buf, PAGE_SIZE, 1024 * getpagesize());
 
 	if (kerndat_uffd() || !kdat.has_uffd)
 		return -1;

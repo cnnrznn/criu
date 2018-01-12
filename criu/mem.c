@@ -883,16 +883,6 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 	unsigned int nr_lazy = 0;
 	unsigned long va;
 
-    struct page_read cpr;
-    struct pico_page_list *plhead = NULL;
-    if (opts.pico_cache) {
-        int dfd = open(opts.pico_cache, O_RDONLY);
-        ret = open_page_read_at(dfd, vpid(t), &cpr, PR_TASK);
-        if(ret <= 0)
-            return -1;
-        close(dfd);
-    }
-
 	if (opts.check_only) {
 		pr->close(pr);
 		return 0;
@@ -923,72 +913,6 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 		 * on demand.
 		 */
 		if (opts.lazy_pages && pagemap_lazy(pr->pe)) {
-            if (opts.pico_cache) {
-                /*
-                * for every cached pme in the region of this pme,
-                * if the version # matches, load it into memory
-                */
-                uint64_t end;
-                uint32_t nrp;
-                void *p;
-                cpr.seek_pagemap(&cpr, va);
-                if (cpr.cvaddr < va)
-                    cpr.skip_pages(&cpr, va - cpr.cvaddr);
-
-                // pme is not in cache, flush entire region
-                if ((void*)cpr.cvaddr >= iov.iov_base+iov.iov_len) {
-                    while (pr->cvaddr >= vma->e->end) {
-                        if (vma->list.next == vmas)
-                            goto err_addr;
-                        vma = list_entry(vma->list.next, struct vma_area, list);
-                    }
-                    off = pr->cvaddr - vma->e->start;
-                    p = decode_pointer(off + vma->premmaped_addr);
-
-                    struct pico_page_list *plent = malloc(sizeof(struct pico_page_list));
-                    plent->addr = (unsigned long)p;
-                    plent->size = pr->pe->nr_pages * PAGE_SIZE;
-                    plent->next = plhead;
-                    plhead = plent;
-                }
-
-                while ((void*)cpr.cvaddr < iov.iov_base+iov.iov_len) {
-                    end = MIN(cpr.pe->vaddr+(cpr.pe->nr_pages*PAGE_SIZE),
-                                (uint64_t)(iov.iov_base+iov.iov_len));
-
-                    while (cpr.cvaddr >= vma->e->end) {
-                        if (vma->list.next == vmas)
-                            goto err_addr;
-                        vma = list_entry(vma->list.next, struct vma_area, list);
-                    }
-                    off = (cpr.cvaddr - vma->e->start) / PAGE_SIZE;
-                    p = decode_pointer((off) * PAGE_SIZE + vma->premmaped_addr);
-
-                    nrp = (end - cpr.cvaddr) / PAGE_SIZE;
-
-                    if (cpr.pe->version == pr->pe->version
-                            && cpr.pe->flags & PE_PRESENT) {
-                        pr_debug("CONNOR: restoring %d pages at 0x%lx into 0x%lx from cache\n", nrp, cpr.cvaddr, (unsigned long)p);
-
-                        ret = cpr.read_pages(&cpr, cpr.cvaddr, nrp, p, 0);
-                        if (ret < 0)
-                            goto err_read;
-
-                        nr_restored += nrp;
-                    }
-                    else {
-                        pr_debug("CONNOR: %d pages at 0x%lx are dirty\n", nrp, cpr.cvaddr);
-
-                        struct pico_page_list *plent = malloc(sizeof(struct pico_page_list));
-                        plent->addr = (unsigned long)p;
-                        plent->size = end - cpr.cvaddr;
-                        plent->next = plhead;
-                        plhead = plent;
-
-                        cpr.skip_pages(&cpr, end - cpr.cvaddr);
-                    }
-                }
-            }
 			pr_debug("Lazy restore skips %ld pages at %lx\n", nr_pages, va);
 			pr->skip_pages(pr, nr_pages * PAGE_SIZE);
 			nr_lazy += nr_pages;
@@ -1100,20 +1024,7 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 		}
 	}
 
-    while (plhead != NULL) {
-        int madr = madvise((void*)plhead->addr, plhead->size, MADV_DONTNEED);
-        if (madr < 0) {
-            //pr_err("CONNOR: madvise(..., MADV_DONTNEED) failed\n");
-            exit(1);
-        }
-
-        plhead = plhead->next;
-    }
-
 err_read:
-    if (opts.pico_cache)
-        cpr.close(&cpr);
-
 	if (pr->sync(pr))
 		return -1;
 
