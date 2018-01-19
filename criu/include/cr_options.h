@@ -136,6 +136,7 @@ struct cr_options {
     bool            pico_crash;         /* report critical failures to manager */
     uint32_t*       pico_dist;          /* list of peers by closest->farthest */
     int             pico_npeers;        /* number of peers in system */
+    int             pico_bs;            /* block size for page faults */
 };
 
 extern struct cr_options opts;

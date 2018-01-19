@@ -218,9 +218,8 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     int plist_count = 0;
 
     // compute start of boundary
-#define BLOCK_SIZE 64
-    const unsigned long block = addr - (addr % (BLOCK_SIZE * PAGE_SIZE));
-    const unsigned long blockend = block + (BLOCK_SIZE * PAGE_SIZE);
+    const unsigned long block = addr - (addr % (opts.pico_bs * PAGE_SIZE));
+    const unsigned long blockend = block + (opts.pico_bs * PAGE_SIZE);
     unsigned long start = 0;
     int nr_pages = 0;
 

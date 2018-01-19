@@ -508,6 +508,7 @@ int main(int argc, char *argv[], char *envp[])
         { "pico-crash",         no_argument,        0, 2007},
         { "pico-dist",          required_argument,  0, 2008},
         { "pico-npeers",        required_argument,  0, 2009},
+        { "pico-bs",            required_argument,  0, 2010},
 
 		{ },
 	};
@@ -864,6 +865,9 @@ int main(int argc, char *argv[], char *envp[])
             break;
         case 2009:
             opts.pico_npeers = atoi(optarg);
+            break;
+        case 2010:
+            opts.pico_bs = atoi(optarg);
             break;
 		case 1089:
 			break;
