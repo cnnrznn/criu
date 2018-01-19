@@ -123,39 +123,21 @@ disk_serve_get_pages(int sk, struct page_server_iov *pi)
     struct disk_pages other, *dps;
     other.pid = pi->dst_id;
     void *buf = malloc(pi->nr_pages * PAGE_SIZE);
-    int nr_sent = 0;
 
     dps = binsearch(&dpgs_arr, &other, 0, dpgs_index-1);
 
     dps->pr.reset(&dps->pr);
     dps->pr.seek_pagemap(&dps->pr, pi->vaddr);
     dps->pr.skip_pages(&dps->pr, pi->vaddr > dps->pr.cvaddr ? pi->vaddr - dps->pr.cvaddr : 0);
-    //dps->pr.skip_pages(&dps->pr, pi->vaddr - dps->pr.pe->vaddr);
 
-    //pr_debug("CONNOR: seeked to pagemap 0x%lx\n", dps->pr.cvaddr);
-
-    //dps->pr.read_pages(&dps->pr, pi->vaddr, pi->nr_pages, buf, 0);
+    dps->pr.read_pages(&dps->pr, pi->vaddr, pi->nr_pages, buf, 0);
     //pr_debug("CONNOR: read %d pages starting at %lx into buffer\n", pi->nr_pages, (long unsigned)pi->vaddr);
 
     pr_debug("CONNOR: time before page write\n");
-    while (nr_sent < pi->nr_pages) {
-        unsigned long start = dps->pr.cvaddr;
-        unsigned long end = MIN(dps->pr.pe->vaddr + (dps->pr.pe->nr_pages * PAGE_SIZE),
-                                    dps->pr.cvaddr + ((pi->nr_pages - nr_sent) * PAGE_SIZE));
-        if (pagemap_contains_addr(dps->pr.pe->n_addrs, dps->pr.pe->addrs, opts.pico_addr.s_addr) &&
-                dps->pr.pe->flags & PE_LAZY) {
-            dps->pr.read_pages(&dps->pr, dps->pr.cvaddr, (end - dps->pr.cvaddr)/PAGE_SIZE, buf, 0);
-            if (write(sk, buf, (end - start)) != (end - start)) {
-                ret = -1;
-                pr_err("CONNOR: failed to serve disk pages\n");
-                goto out;
-            }
-            nr_sent += (end - start) / PAGE_SIZE;
-        }
-        else {
-            dps->pr.skip_pages(&dps->pr, end - dps->pr.cvaddr);
-        }
-        dps->pr.advance(&dps->pr);
+    if (write(sk, buf, pi->nr_pages*PAGE_SIZE) != pi->nr_pages*PAGE_SIZE) {
+        ret = -1;
+        pr_err("CONNOR: failed to serve disk pages\n");
+        goto out;
     }
     pr_debug("CONNOR: time after page write\n");
 

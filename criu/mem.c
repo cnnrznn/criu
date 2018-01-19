@@ -896,7 +896,6 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 	 */
 	while (1) {
 		unsigned long off, i, nr_pages;
-        struct iovec iov;
 
 		ret = pr->advance(pr);
 		if (ret <= 0)
@@ -904,9 +903,6 @@ static int restore_priv_vma_content(struct pstree_item *t, struct page_read *pr)
 
 		va = (unsigned long)decode_pointer(pr->pe->vaddr);
 		nr_pages = pr->pe->nr_pages;
-
-        iov.iov_base = (void*)va;
-        iov.iov_len = nr_pages * PAGE_SIZE;
 
 		/*
 		 * This means that userfaultfd is used to load the pages

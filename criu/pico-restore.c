@@ -214,13 +214,12 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     // request pages from page server
 
-    struct pico_page_list *plhead = NULL;
+    struct pico_page_list *plhead = NULL, *pl;
     int plist_count = 0;
 
     // compute start of boundary
     const unsigned long block = addr - (addr % (opts.pico_bs * PAGE_SIZE));
     const unsigned long blockend = block + (opts.pico_bs * PAGE_SIZE);
-    unsigned long start = 0;
     int nr_pages = 0;
 
     // find first pagemap entry at start of boundary
@@ -234,8 +233,6 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     while (pr->pe->vaddr < blockend) {
         if (pagemap_contains_addr(pr->pe->n_addrs, pr->pe->addrs, pico_addr) &&
                 pr->pe->flags & PE_LAZY) {
-            if (!start)
-                start = pr->cvaddr;
             unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
             nr_pages += (end - pr->cvaddr) / PAGE_SIZE;
 
@@ -252,49 +249,44 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
 
     pico_remote_pages(server->addr, plhead, plist_count);
 
-	struct page_server_iov pi = {
-		.cmd		= PS_IOV_GET,
-		.nr_pages	= nr_pages,
-		.vaddr		= start,
-		.dst_id		= pr->pid,
-	};
+    for (pl=plhead; pl; pl=pl->next) {
+        struct page_server_iov pi = {
+            .cmd		= PS_IOV_GET,
+            .nr_pages	= pl->size / PAGE_SIZE,
+            .vaddr		= pl->addr,
+            .dst_id		= pr->pid,
+        };
 
-    //if (pico_soft_migrate(pico_addr, nr_pages))
-    //    goto jail;
+        //if (pico_soft_migrate(pico_addr, nr_pages))
+        //    goto jail;
 
-	/* We cannot use send_psi here because we have to use MSG_DONTWAIT */
-	if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
-		pr_perror("Can't write PSI to server");
-		return -1;
-	}
+        /* We cannot use send_psi here because we have to use MSG_DONTWAIT */
+        if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
+            pr_perror("Can't write PSI to server");
+            return -1;
+        }
+    }
 
     // flush socket buffer
 	tcp_nodelay(server->sk, true);
 
     // recv page data
     int total_recv = 0;
-    pr->reset(pr);
-    pr->seek_pagemap(pr, start);
-    pr->skip_pages(pr, start > pr->cvaddr ? start - pr->cvaddr : 0);
 
     pr_debug("CONNOR: time before page read\n");
-    while (pr->pe->vaddr < blockend) {
-        if (pagemap_contains_addr(pr->pe->n_addrs, pr->pe->addrs, pico_addr) &&
-                pr->pe->flags & PE_LAZY) {
-            unsigned long end = MIN(pr->pe->vaddr + (pr->pe->nr_pages * PAGE_SIZE), blockend);
-            total_recv = 0;
-            while (total_recv < (end - pr->cvaddr)) {
-                int tmp = read(server->sk, pico_uffd_buf + total_recv, (end - pr->cvaddr) - total_recv);
-                total_recv += tmp;
-            }
-            // copy pe into uffdio_copy
-            if (read_page_complete(pr->pid, pr->cvaddr, (end - pr->cvaddr)/PAGE_SIZE, pr))
-                return -1;
+    for (pl=plhead; pl; pl=pl->next) {
+        total_recv = 0;
+        while (total_recv < pl->size) {
+            int tmp = read(server->sk, pico_uffd_buf + total_recv, pl->size - total_recv);
+            total_recv += tmp;
         }
-        if (!pr->advance(pr))
-            break;
+        // copy pe into uffdio_copy
+        if (read_page_complete(pr->pid, pl->addr, pl->size/PAGE_SIZE, pr))
+            return -1;
     }
     pr_debug("CONNOR: time after page read\n\n");
+
+    pico_page_list_free(plhead);
 
     /*pr_debug("CONNOR: pico-restore raw page data (%lu):\n", nr * PAGE_SIZE);
     pr_debug("====================\n");

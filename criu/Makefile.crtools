@@ -99,6 +99,7 @@ obj-y           += pico-soft_mig.o
 obj-y           += pico-man.o
 obj-y           += pico-util.o
 obj-y           += pico-regfile.o
+obj-y           += pico-page_list.o
 
 ifeq ($(VDSO),y)
 obj-y			+= pie-util-vdso.o

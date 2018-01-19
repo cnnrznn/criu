@@ -52,7 +52,7 @@ void
 pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n)
 {
     int sk = open_comm_sock();
-    struct pico_page_list *p, *tmp;
+    struct pico_page_list *p;
     char dummy;
 
     if (write(sk, REMOTE_PAGES, 1) != 1)
@@ -64,17 +64,11 @@ pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n)
     if (write(sk, &n, 4) != 4)
         exit(1);
 
-    p = pl;
-    while (p != NULL) {
+    for (p=pl; p; p=p->next) {
         if (write(sk, &p->addr, 8) != 8)
             exit(1);
         if (write(sk, &p->size, 8) != 8)
             exit(1);
-
-        tmp = p;
-        p = p->next;
-
-        free(tmp);
     }
 
     read(sk, &dummy, 1); //block in case of migration

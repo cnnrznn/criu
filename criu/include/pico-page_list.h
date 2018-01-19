@@ -7,4 +7,7 @@ struct pico_page_list {
     struct pico_page_list *next;
 };
 
+void
+pico_page_list_free(struct pico_page_list *);
+
 #endif /* _PJ_PAGE_LIST_H */
