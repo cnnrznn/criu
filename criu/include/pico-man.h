@@ -8,8 +8,11 @@
 void
 pico_crash(void);
 
-void
+int
 pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n);
+
+void
+pico_remote_pages_fin(int);
 
 void
 migrate_soft(const char ip[15]);

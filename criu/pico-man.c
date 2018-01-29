@@ -48,7 +48,7 @@ pico_crash(void)
     close(sk);
 }
 
-void
+int
 pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n)
 {
     int sk = open_comm_sock();
@@ -73,6 +73,14 @@ pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n)
 
     read(sk, &dummy, 1); //block in case of migration
 
+    return sk;
+}
+
+void
+pico_remote_pages_fin(int sk)
+{
+    char dummy;
+    write(sk, &dummy, 1);
     close(sk);
 }
 

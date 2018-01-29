@@ -247,7 +247,7 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
             break;
     }
 
-    pico_remote_pages(server->addr, plhead, plist_count);
+    int psk = pico_remote_pages(server->addr, plhead, plist_count);
 
     for (pl=plhead; pl; pl=pl->next) {
         struct page_server_iov pi = {
@@ -285,6 +285,8 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
             return -1;
     }
     pr_debug("CONNOR: time after page read\n\n");
+
+    pico_remote_pages_fin(psk);
 
     pico_page_list_free(plhead);
 
