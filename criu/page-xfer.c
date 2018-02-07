@@ -772,6 +772,7 @@ static int page_server_serve(int sk, int lsk)
                 ret = recv(events[0].data.fd, &pi, sizeof(pi), MSG_WAITALL);
                 if (ret != sizeof(pi)) {
                     epoll_ctl(epfd, EPOLL_CTL_DEL, events[0].data.fd, NULL);
+                    close(events[0].data.fd);
                     continue;
                 }
             }
