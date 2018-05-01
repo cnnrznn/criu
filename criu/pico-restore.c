@@ -247,7 +247,7 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
             break;
     }
 
-    int psk = pico_remote_pages(server->addr, plhead, plist_count);
+    pico_remote_pages(server->addr, plhead, plist_count);
 
     for (pl=plhead; pl; pl=pl->next) {
         struct page_server_iov pi = {
@@ -260,10 +260,12 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
         //if (pico_soft_migrate(pico_addr, nr_pages))
         //    goto jail;
 
-        /* We cannot use send_psi here because we have to use MSG_DONTWAIT */
-        if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
-            pr_perror("Can't write PSI to server");
-            return -1;
+        if (pl->ws == 0) {
+                /* We cannot use send_psi here because we have to use MSG_DONTWAIT */
+                if (send(server->sk, &pi, sizeof(pi), MSG_DONTWAIT) != sizeof(pi)) {
+                    pr_perror("Can't write PSI to server");
+                    return -1;
+                }
         }
     }
 
@@ -276,17 +278,27 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     pr_debug("CONNOR: time before page read\n");
     for (pl=plhead; pl; pl=pl->next) {
         total_recv = 0;
-        while (total_recv < pl->size) {
-            int tmp = read(server->sk, pico_uffd_buf + total_recv, pl->size - total_recv);
-            total_recv += tmp;
+
+        if (pl->ws) {
+                pr_debug("CONNOR: activeset %lx, %lx\n", pl->addr, pl->size);
+                activeset_get(pl->addr, pl->size, pico_uffd_buf);
         }
+        else {
+                while (total_recv < pl->size) {
+                    int tmp = read(server->sk, pico_uffd_buf + total_recv, pl->size - total_recv);
+                    total_recv += tmp;
+                }
+        }
+
+        pr_debug("CONNOR: going to read_page_complete\n");
+
         // copy pe into uffdio_copy
         if (read_page_complete(pr->pid, pl->addr, pl->size/PAGE_SIZE, pr))
             return -1;
     }
     pr_debug("CONNOR: time after page read\n\n");
 
-    pico_remote_pages_fin(psk);
+    pico_remote_pages_fin();
 
     pico_page_list_free(plhead);
 

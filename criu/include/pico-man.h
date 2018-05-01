@@ -8,13 +8,19 @@
 void
 pico_crash(void);
 
-int
+void
 pico_remote_pages(uint32_t addr, struct pico_page_list *pl, int n);
 
 void
-pico_remote_pages_fin(int);
+pico_remote_pages_fin();
 
 void
 migrate_soft(const char ip[15]);
+
+void
+activeset_append(struct iovec, void *);
+
+void
+activeset_get(unsigned long addr, unsigned long size, void *buf);
 
 #endif /* _PJ_PICO_MAN_H */

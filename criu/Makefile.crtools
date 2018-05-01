@@ -101,6 +101,8 @@ obj-y           += pico-util.o
 obj-y           += pico-regfile.o
 obj-y           += pico-page_list.o
 
+obj-y		+= pico-pm-filter.o
+
 ifeq ($(VDSO),y)
 obj-y			+= pie-util-vdso.o
 obj-y			+= vdso.o

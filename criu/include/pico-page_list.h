@@ -4,6 +4,7 @@
 struct pico_page_list {
     unsigned long addr;
     unsigned long size;
+    char ws;
     struct pico_page_list *next;
 };
 

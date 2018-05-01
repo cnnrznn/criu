@@ -58,6 +58,7 @@
 
 #include "../soccr/soccr.h"
 
+#include "pico-pm-filter.h"
 #include "pico-util.h"
 
 struct cr_options opts;
@@ -869,21 +870,21 @@ int main(int argc, char *argv[], char *envp[])
         case 2010:
             opts.pico_bs = atoi(optarg);
             break;
-		case 1089:
-			break;
-		case 1090:
-			break;
-		case 'V':
-			pr_msg("Version: %s\n", CRIU_VERSION);
-			if (strcmp(CRIU_GITID, "0"))
-				pr_msg("GitID: %s\n", CRIU_GITID);
-			return 0;
-		case 'h':
-			usage_error = false;
-			goto usage;
-		default:
-			goto usage;
-		}
+        case 1089:
+                break;
+        case 1090:
+                break;
+        case 'V':
+                pr_msg("Version: %s\n", CRIU_VERSION);
+                if (strcmp(CRIU_GITID, "0"))
+                        pr_msg("GitID: %s\n", CRIU_GITID);
+                return 0;
+        case 'h':
+                usage_error = false;
+                goto usage;
+        default:
+                goto usage;
+        }
 	}
 
 	if (opts.deprecated_ok)

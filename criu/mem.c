@@ -35,6 +35,7 @@
 #include "images/pagemap.pb-c.h"
 #include "pico-page_list.h"
 #include "pico-cache.h"
+#include "pico-pm-filter.h"
 
 #define MIN(a, b) a < b ? a : b;
 
@@ -480,10 +481,11 @@ int parasite_dump_pages_seized(struct pstree_item *item,
 	}
 
 	ret = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, false);
-    if (opts.pico_dump) {
+    /*if (opts.pico_dump) {
         mdc->lazy = true;
         ret_meta = __parasite_dump_pages_seized(item, pargs, vma_area_list, mdc, ctl, true);
-    }
+    }*/
+        pico_pm_filter(vpid(item));
 
     if (opts.pico_cache)
         pico_reset_pagemap_cache();
