@@ -20,7 +20,7 @@ migrate_soft(const char ip[15]);
 void
 activeset_append(struct iovec, void *);
 
-void
-activeset_get(unsigned long addr, unsigned long size, void *buf);
+size_t
+activeset_get(unsigned long addr, void *buf);
 
 #endif /* _PJ_PICO_MAN_H */

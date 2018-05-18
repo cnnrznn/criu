@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "log.h"
+#include "page.h"
 #include "pico-man.h"
 #include "pico-page_list.h"
 
@@ -151,23 +152,27 @@ activeset_append(struct iovec iov, void *buf)
         close(sk);
 }
 
-void
-activeset_get(unsigned long addr, unsigned long size, void *buf)
+size_t
+activeset_get(unsigned long addr, void *buf)
 {
         int sk;
         int total = 0;
         int tmp;
+        size_t np;
 
         sk = open_comm_sock();
 
         write (sk, ACTIVESET, 1);
 
         write(sk, &addr, 8);
-        write(sk, &size, 8);
-        while (total < size) {
-                tmp = read(sk, buf + total, size - total);
+        read(sk, &np, 8);
+
+        while (total < np * PAGE_SIZE) {
+                tmp = read(sk, buf + total, (np * PAGE_SIZE) - total);
                 total += tmp;
         }
 
         close(sk);
+
+        return np;
 }

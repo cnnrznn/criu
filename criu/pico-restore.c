@@ -126,6 +126,7 @@ comp_page_servers(void *a, void *b)
 int
 pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *buf)
 {
+        size_t np;
     /*
     * 0. if pinned, checkpoint and restore on page owner's machine
     * 1. get address and port from pr pagemap entry
@@ -212,6 +213,15 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
         quicksort(0, page_servers_ct-1, &page_servers_arr);
     }
 
+        // first, see if page is in pagemap
+        np = activeset_get(addr, pico_uffd_buf);
+        if (np) {
+                // copy pe into uffdio_copy
+                if (read_page_complete(pr->pid, addr, np, pr))
+                        return -1;
+                return 0;
+        }
+
     // request pages from page server
 
     struct pico_page_list *plhead = NULL, *pl;
@@ -279,22 +289,16 @@ pico_get_remote_pages(struct page_read *pr, long unsigned addr, int nr, void *bu
     for (pl=plhead; pl; pl=pl->next) {
         total_recv = 0;
 
-        if (pl->ws) {
-                pr_debug("CONNOR: activeset %lx, %lx\n", pl->addr, pl->size);
-                activeset_get(pl->addr, pl->size, pico_uffd_buf);
-        }
-        else {
+        if (pl->ws == 0) {
                 while (total_recv < pl->size) {
                     int tmp = read(server->sk, pico_uffd_buf + total_recv, pl->size - total_recv);
                     total_recv += tmp;
                 }
+
+                // copy pe into uffdio_copy
+                if (read_page_complete(pr->pid, pl->addr, pl->size/PAGE_SIZE, pr))
+                        return -1;
         }
-
-        pr_debug("CONNOR: going to read_page_complete\n");
-
-        // copy pe into uffdio_copy
-        if (read_page_complete(pr->pid, pl->addr, pl->size/PAGE_SIZE, pr))
-            return -1;
     }
     pr_debug("CONNOR: time after page read\n\n");
 
