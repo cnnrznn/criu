@@ -714,7 +714,14 @@ static int ud_open(int client, struct lazy_pages_info **_lpi)
                         exit(1);
                     }
 
-                    uffd_copy(lpi, read_start, (end - read_start) / PAGE_SIZE);
+                    while (uffd_copy(lpi, read_start, (end - read_start) / PAGE_SIZE)) {
+                            /*pr_debug("====================\n");
+                            int logfd = log_get_fd();
+                            int foo = write(logfd, pico_uffd_buf, end - read_start);
+                            if (foo < end - read_start)
+                                pr_debug("CONNOR: foo\n");
+                            pr_debug("\n====================\n");*/
+                    }
                 }
                 else {
                     // 4. else skip_pages
@@ -816,8 +823,8 @@ static int complete_page_fault(struct lazy_pages_info *lpi, unsigned long img_ad
 
 	BUG_ON(!addr);
 
-	if (uffd_copy(lpi, addr, nr))
-		return -1;
+	while (uffd_copy(lpi, addr, nr))
+		; //return -1;
 
 	return drop_lazy_iovs(lpi, addr, nr * PAGE_SIZE);
 }
