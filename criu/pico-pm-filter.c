@@ -130,8 +130,11 @@ pico_pm_filter(int pid)
                         in_ws = next_ws_iov(&wsiov, &wsi, wsn, wslist,
                                         (unsigned long)iov.iov_base + iov.iov_len);
                         //in_ws = 1;
+                        //wsiov.iov_base = iov.iov_base;
+                        //wsiov.iov_len = iov.iov_len;
 
                         if (pr.pe->flags == PE_PRESENT) {       // must dump
+                        //if (pr.pe->flags & PE_PRESENT) {        // always true
                                 pe_flags = PE_PRESENT;
                                 pr.read_pages(&pr, (unsigned long)wsiov.iov_base,
                                                 wsiov.iov_len / PAGE_SIZE,

@@ -642,14 +642,14 @@ int collect_sockets(struct ns_id *ns)
 	req.hdr.nlmsg_seq	= CR_NLMSG_SEQ;
 
 	/* Collect UNIX sockets */
-	req.r.u.sdiag_family	= AF_UNIX;
-	req.r.u.udiag_states	= -1; /* All */
-	req.r.u.udiag_show	= UDIAG_SHOW_NAME | UDIAG_SHOW_VFS |
-				  UDIAG_SHOW_PEER | UDIAG_SHOW_ICONS |
-				  UDIAG_SHOW_RQLEN;
-	tmp = do_collect_req(nl, &req, sizeof(req), unix_receive_one, ns, NULL);
-	if (tmp)
-		err = tmp;
+	//req.r.u.sdiag_family	= AF_UNIX;
+	//req.r.u.udiag_states	= -1; /* All */
+	//req.r.u.udiag_show	= UDIAG_SHOW_NAME | UDIAG_SHOW_VFS |
+	//			  UDIAG_SHOW_PEER | UDIAG_SHOW_ICONS |
+	//			  UDIAG_SHOW_RQLEN;
+	//tmp = do_collect_req(nl, &req, sizeof(req), unix_receive_one, ns, NULL);
+	//if (tmp)
+	//	err = tmp;
 
 	/* Collect IPv4 TCP sockets */
 	req.r.i.sdiag_family	= AF_INET;
