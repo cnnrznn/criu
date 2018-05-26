@@ -826,7 +826,8 @@ static int complete_page_fault(struct lazy_pages_info *lpi, unsigned long img_ad
 	while (uffd_copy(lpi, addr, nr))
 		; //return -1;
 
-	return drop_lazy_iovs(lpi, addr, nr * PAGE_SIZE);
+	//return drop_lazy_iovs(lpi, addr, nr * PAGE_SIZE);
+        return 0;
 }
 
 static int uffd_io_complete(struct page_read *pr, unsigned long img_addr, int nr)
